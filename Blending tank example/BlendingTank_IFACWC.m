@@ -98,10 +98,19 @@ fs.fault.time = 2185;
 fs.fault.triggered = false;
 
 %% Monitoring parameters
-m.nComponents = 2;
-m.T2_threshold = 30;
-m.SPE_threshold = 20;
+% Measurements to include in monitoring model
+m.y_fields = {'C','C0','F0','FW', 'F', 'L'};
 
+% Model hyperparameters
+m.hyperparam.nComponents = 2;
+m.hyperparam.T2_threshold = 30;
+m.hyperparam.SPE_threshold = 20;
+
+% Specify model training time
+m.Training = true;      % Determines if monitoring method is still trainign
+m.trainingTime = 2000;  % Time taken to train monitoring method
+
+% Current flags on any component
 m.Component.C.faultFlag = false;
 
 %% Disturbance variables
