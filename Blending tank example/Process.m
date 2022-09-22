@@ -1,16 +1,15 @@
-function x = Process(x, u, d, fp, tspan, p)
+function x = Process(x, u, d, fp, t, p)
 
 %     % Using ode45
-%     [~, xvec] = ode45(@(t, x) ODEs(t, x, y, sp, d, p), tspan, struct2vec(x, p));
+%     [~, xvec] = ode45(@(t, x) ODEs(t, x, y, sp, d, p), [t.Time(end-1) t.Time(end)], struct2vec(x, p));
     
     % Using hardcoded RK4
-    dt = tspan(end) - tspan(1);     % Time step
     x0 = struct2vec(x, p);          % Initial values as a vector
-    k1 = ODEs(tspan(1), x0, u, d, fp, p);
-    k2 = ODEs(tspan(1) + dt/2, x0 + dt/2*k1, u, d, fp, p);
-    k3 = ODEs(tspan(1) + dt/2, x0 + dt/2*k2, u, d, fp, p);
-    k4 = ODEs(tspan(1) + dt, x0 + dt*k3, u, d, fp, p);
-    xvec = (x0 + dt/6*(k1 + 2*k2 + 2*k3 + k4))';    % Transpose to generate row vector, as would be done using ode45
+    k1 = ODEs(t.Time(end-1),          x0,           u, d, fp, p);
+    k2 = ODEs(t.Time(end-1) + t.dt/2, x0 + dt/2*k1, u, d, fp, p);
+    k3 = ODEs(t.Time(end-1) + t.dt/2, x0 + dt/2*k2, u, d, fp, p);
+    k4 = ODEs(t.Time(end) ,           x0 + dt*k3,   u, d, fp, p);
+    xvec = (x0 + t.dt/6*(k1 + 2*k2 + 2*k3 + k4))';    % Transpose to generate row vector, as would be done using ode45
 
     % Generate the necessary structures
     x = vec2struct(xvec(end,:), x, p);
@@ -22,7 +21,7 @@ function dxdt = ODEs(t, xvec, u, d, fp, p)
     ddt.m = d.C0(t)*d.F0(t) - x.C*x.F;
     ddt.V = d.F0(t) + x.FW - x.F;
     ddt.xv = x.v;
-    ddt.v = (1/p.tau^2)*(u.xv - x.xv) - 2*p.xi/p.tau*x.v);
+    ddt.v = (1/p.tau^2)*(u.xv - x.xv) - 2*p.xi/p.tau*x.v;
     
     % Maintain fraction valve opening in [0, 1]
     if (x.xv == 0) && (ddt.v < 0)
@@ -36,7 +35,7 @@ function dxdt = ODEs(t, xvec, u, d, fp, p)
     dxdt = struct2vec(ddt, p);
 end
 
-function x = intermediateVariables(x, u, d, fp, p)
+function x = intermediateVariables(x, u, fp, p)
     x.C = x.m/x.V;
     x.L = x.V/p.A;
     x.FW = p.cv*x.xv;
@@ -50,7 +49,7 @@ function x = vec2struct(xvec, x, p)
     x.xv(end) = min(max(x.xv(end), 0), 1); % ~, valve fraction opening, limit between 0 and 1
 
     % Add intermediate variables to structure
-    x = intermediateVariables(x, u, d, fp, p);
+    x = intermediateVariables(x, u, fp, p);
 end
 
 function xvec = struct2vec(x, p)
