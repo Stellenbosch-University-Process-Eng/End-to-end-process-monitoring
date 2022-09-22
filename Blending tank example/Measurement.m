@@ -1,7 +1,7 @@
 function y = Measurement(y, x, fs, t)
     for i = 1: length(y.fields)
         f = y.fields{i};
-        current = y.(f).function(t.Time(end), x, sp, d, v) + y.(f).noise_var*randn;
+        current = y.(f).function(t.Time(end), x, sp, d) + y.(f).noise_var*randn;
         
         if strcmp(fs.(f).state, 'Stuck')
             current = y.(f).Data(end); 
