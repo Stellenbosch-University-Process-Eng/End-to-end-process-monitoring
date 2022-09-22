@@ -18,8 +18,8 @@ end
 function dxdt = ODEs(t, xvec, u, d, fp, p)
     x = vec2struct(xvec, p.x_empty, p);
 
-    ddt.m = d.C0(t)*d.F0(t) - x.C*x.F;
-    ddt.V = d.F0(t) + x.FW - x.F;
+    ddt.m = d.C0(t)*x.F0 - x.C*x.F;
+    ddt.V = x.F0 + x.FW - x.F;
     ddt.xv = x.v;
     ddt.v = (1/p.tau^2)*(u.xv - x.xv) - 2*p.xi/p.tau*x.v;
     
@@ -39,7 +39,8 @@ function x = intermediateVariables(x, u, fp, p)
     x.C = x.m/x.V;
     x.L = x.V/p.A;
     x.FW = p.cv*x.xv;
-    x.F  = p.kv*sqrt(x.L);
+    x.F0 = u.F0*d.F0(t);
+    x.F  = u.FW*p.kv*sqrt(x.L);
 end
 
 function x = vec2struct(xvec, x, p)
