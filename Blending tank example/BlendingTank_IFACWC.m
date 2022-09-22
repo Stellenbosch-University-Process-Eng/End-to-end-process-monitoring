@@ -105,6 +105,7 @@ m.T2_threshold = 30;
 m.SPE_threshold = 20;
 
 %% Disturbance variables
+
 % Create stochastic inlet flowrate and concentrations over time
 F0 = 0*t; C0 = 0*t;
 for i = 2:length(t)
@@ -118,9 +119,21 @@ d.F0 = griddedInterpolant(t, F0);
 d.C0 = griddedInterpolant(t, C0);
 clear F0 C0
 
-%% Set-point changes
-% Specify set-point changes
-r.C = @(t) 0.5 + 0.*(t>(3600*0.5));
+%% Supervisory control
+r.Components.fields = {'valveF0','valveFW','valveF', 'C','C0','F0','FW', 'F', 'L'};
+for i = 1:length(r.Components.fields)
+    f = r.Components.fields{i};
+    r.Components.(f).faultFlag = false;
+    r.Components.(f).commision = 0;
+end
+
+r.Shutdown.Period = 3600;   % s, length of a shut down
+r.Shutdown.levelThreshold = 0.01;   % m, level at which to switch from "Shutdown" to "Shut"
+r.Startup.levelThreshold = 0.5;     % m, level at which to switch from "Startup" to "Running"
+r.Running.plannedMaintenancePeriod = 7200;  % s, time before planned maintenance
+r.Regime = 'Startup';
+r.Startup.times = 0;
+
 
 %% Initialize
 % Initialize the process state variables
