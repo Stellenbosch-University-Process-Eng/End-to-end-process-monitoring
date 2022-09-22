@@ -36,6 +36,13 @@ function dxdt = ODEs(t, xvec, u, d, fp, p)
     dxdt = struct2vec(ddt, p);
 end
 
+function x = intermediateVariables(x, u, d, fp, p)
+    x.C = x.m/x.V;
+    x.L = x.V/p.A;
+    x.FW = p.cv*x.xv;
+    x.F  = p.kv*sqrt(x.L);
+end
+
 function x = vec2struct(xvec, x, p)
     for i = 1:length(p.state_fields)
         x.(p.state_fields{i}) = [x.(p.state_fields{i}); xvec(i)];
