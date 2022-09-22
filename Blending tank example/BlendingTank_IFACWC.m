@@ -5,7 +5,8 @@ clf
 rng(1)
 
 %% Time span
-t = 0:7200;    % s, over one day
+t.dt = 1;       % s
+t.tmax = 7200;  % s, simulation time
 
 %% Parameters
 % Define process parameters
@@ -32,31 +33,31 @@ end
 y.fields = {'C','C0','F0','FW', 'F', 'L', 'KPI'};
 
 % Concentration in the tank
-y.C.function = @(t, x, sp, d, v) x.C(end);
+y.C.function = @(t, x, sp, d) x.C(end);
 y.C.noise_var = 0.01;
 
 % Inlet concentration
-y.C0.function = @(t, x, sp, d, v) d.C0(t);
+y.C0.function = @(t, x, sp, d) d.C0(t);
 y.C0.noise_var = 0.01;
 
 % Inlet flowrate
-y.F0.function = @(t, x, sp, d, v) d.F0(t);
+y.F0.function = @(t, x, sp, d) x.F0(end);
 y.F0.noise_var = 0.002;
 
 % Water flowrate
-y.FW.function = @(t, x, sp, d, v) v.FW(end);
+y.FW.function = @(t, x, sp, d) x.FW(end);
 y.FW.noise_var = 0.002;
 
 % Liquid level
-y.L.function = @(t, x, sp, d, v) x.L(end);
+y.L.function = @(t, x, sp, d) x.L(end);
 y.L.noise_var = 0.002;
 
 % Outlet flowrate
-y.F.function = @(t, x, sp, d, v) v.F(end);
+y.F.function = @(t, x, sp, d) x.F(end);
 y.F.noise_var = 0.002;
 
 % Key performance indicator
-y.KPI.function = @(t, x, sp, d, v) exp( -40*(x.C(end) - sp.C(t)).^2 );
+y.KPI.function = @(t, x, sp, d) exp( -40*(x.C(end) - sp.C(t)).^2 );
 y.KPI.noise_var = 0;
     
 % Initialize measurements
@@ -135,27 +136,14 @@ shut = [];  % s, vector containing time values where plant was shut down
 
 disp('Simulation started')
 
-i = 1;
-while t(i) < t(end)
-    i = i+1;
-    x = Process(x, u, d, fp, t(i-1:i), p);
-    fp = ProcessFault(fp, x, t(i));
-    fs = SensorFault(fs, x, t(i));
+t.Time = 0;
+while t.Time(end) < t.tmax
+    t.Time = [t.Time t.Time(end)+t.dt];
+    x = Process(x, u, d, fp, t, p);
+    fp = ProcessFault(fp, x, t);
+    fs = SensorFault(fs, x, t);
     y = Measurement(y, x, fs, t);
 
-    % Monitoring related activities
-    if t(i) == 2000 % Train monitoring model
-        [T, T2, SPE, faulty, m] = initMonitoring(y, m);
-        
-    elseif t(i) > 2000 % Continue with monitoring
-        [T(i,:), T2(i), SPE(i), faulty(i)] = Monitoring(y, m);
-
-        if (sum(faulty(i-59:i)) / 60) > 0.8
-            disp('Shut down');
-            shut = [shut t(i)];
-            fs.C.state = 'None';
-        end
-    end
     
     % Fault related activities
     % Trigger a sensor fault
