@@ -171,7 +171,7 @@ while t.Time(end) < t.tmax
     fp = ProcessFault(fp, x, t);
     fs = SensorFault(fs, x, t);
     y = Measurement(y, x, fs, t);
-    m = Monitoring(m, y);
+    m = Monitoring(m, y, t);
     
     disp(t.Time(end)/t.tmax)
 end
