@@ -1,0 +1,5 @@
+# MATLAB autosave
+*.asv
+
+# Office
+*.pptx
