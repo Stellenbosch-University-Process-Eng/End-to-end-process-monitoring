@@ -8,21 +8,19 @@ rng(1)
 t.dt = 1;       % s
 t.tmax = 7200;  % s, simulation time
 
-%% Parameters
+%% Process parameters
 % Define process parameters
-p.A  = 0.5;     % m2, mixing tank cross-sectional area
-p.tauI = 1;     % s, valve time constant
-p.xi = 5;       % ~, valve damping coefficient
-p.K = 0.1;      % m3/kg, controller gain
-p.tauI = 10;    % s, controller time constant
-p.cv = 0.1;     % m3/s, control valve coefficient
-p.kv = 0.06;    % m2.5/s, drainage valve coefficient
+x.parameters.A  = 0.5;     % m2, mixing tank cross-sectional area
+x.parameters.tauI = 1;     % s, valve time constant
+x.parameters.xi = 5;       % ~, valve damping coefficient
+x.parameters.cv = 0.1;     % m3/s, control valve coefficient
+x.parameters.kv = 0.06;    % m2.5/s, drainage valve coefficient
 
 % List of state variables. Create an empty array for each state value,
 % which will be used in the Simulate function
-p.state_fields = {'m', 'V', 'xv', 'v'};
-for i = 1:length(p.state_fields)
-    p.x_empty.(p.state_fields{i}) = [];
+x.fields = {'m', 'V', 'xv', 'v'};
+for i = 1:length(x.fields)
+    x.x_empty.(x.fields{i}) = [];
 end
 %% Measurement parameters
 % List of measurement variables
@@ -104,6 +102,8 @@ m.nComponents = 2;
 m.T2_threshold = 30;
 m.SPE_threshold = 20;
 
+m.Component.C.faultFlag = false;
+
 %% Disturbance variables
 
 % Create stochastic inlet flowrate and concentrations over time
@@ -134,6 +134,9 @@ r.Running.plannedMaintenancePeriod = 7200;  % s, time before planned maintenance
 r.Regime = 'Startup';
 r.Startup.times = 0;
 
+%% Regulatory control
+u.PI.K = 0.1;      % m3/kg, controller gain
+u.PI.tauI = 10;    % s, controller time constant
 
 %% Initialize
 % Initialize the process state variables
@@ -152,16 +155,16 @@ disp('Simulation started')
 t.Time = 0;
 while t.Time(end) < t.tmax
     t.Time = [t.Time t.Time(end)+t.dt];
+    
+    [r, t] = SupervisoryControl(r, m, y, t);
+    u = Control(u, y, r, t);
     x = Process(x, u, d, fp, t, p);
     fp = ProcessFault(fp, x, t);
     fs = SensorFault(fs, x, t);
     y = Measurement(y, x, fs, t);
-
+    m = Monitoring(m, y);
     
-    % Fault related activities
-    % Trigger a sensor fault
-    
-    disp(i/length(t))
+    disp(t.Time(end)/t.tmax)
 end
 disp('Done')
 
