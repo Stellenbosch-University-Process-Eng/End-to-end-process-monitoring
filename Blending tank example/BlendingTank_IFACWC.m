@@ -59,6 +59,13 @@ y.F.noise_var = 0.002;
 y.KPI.function = @(t, x, sp, d, v) exp( -40*(x.C(end) - sp.C(t)).^2 );
 y.KPI.noise_var = 0;
     
+% Initialize measurements
+for i = 1:length(y.fields)
+    f = y.fields{i};
+    y.(f).Time = [];
+    y.(f).Data = [];
+end
+
 %% Process faults (fp)
 % Initialize process fault
 fp.valve.state = 'None';
@@ -70,6 +77,8 @@ fp.valve.state = 'None';
 % such that the drift at time "t" is given by drift = drift_rate * (t - t(incipient fault))
 % The bias simply gives the amount by which the sensor is offset for the
 % "Bias" fault
+
+fs.fields = y.fields;
 
 % Faults for concentration measurement
 fs.C.state = 'None';
@@ -84,6 +93,10 @@ fs.FW.state = 'None';
 fs.F.state = 'None';
 fs.L.state = 'None';
 fs.KPI.state = 'None';
+
+% Parameters specifying when a fault might occur
+fs.fault.time = 2185;
+fs.fault.triggered = false;
 
 %% Monitoring parameters
 m.nComponents = 2;
@@ -109,27 +122,27 @@ clear F0 C0
 r.C = @(t) 0.5 + 0.*(t>(3600*0.5));
 
 %% Initialize
-% Initialize the process variables
+% Initialize the process state variables
 x.m = 0.5; % kg, initial solute concentration in tank
 x.V = 1;   % m3, initial liquid volume in tank
 x.xv = 0.5; % ~, initial fraction valve opening
 x.v = 0;   % 1/s, initial valve velocity
-x = intermediateVariables(x, u, d, fp, p);
 
 %% Integrate ODEs
 % Initialize the simulation
 %y = initMeasurement(x, sp, d, p, y); % Initialize measurements
 shut = [];  % s, vector containing time values where plant was shut down
-fault_time = 2185;
 
 disp('Simulation started')
 
 i = 1;
 while t(i) < t(end)
     i = i+1;
-    x = Simulate(x, u, d, fp, t(i-1:i), p);
-    [y, fs] = updateMeasurement(t(i), x, v, y, sp, d, p, y, fs);
-    
+    x = Process(x, u, d, fp, t(i-1:i), p);
+    fp = ProcessFault(fp, x, t(i));
+    fs = SensorFault(fs, x, t(i));
+    y = Measurement(y, x, fs, t);
+
     % Monitoring related activities
     if t(i) == 2000 % Train monitoring model
         [T, T2, SPE, faulty, m] = initMonitoring(y, m);
@@ -146,9 +159,7 @@ while t(i) < t(end)
     
     % Fault related activities
     % Trigger a sensor fault
-    if (t(i) > fault_time) && isempty(shut)
-        fs.C.state = 'Drift'; %'None', 'Stuck', 'Drift', 'Bias'
-    end
+    
     disp(i/length(t))
 end
 disp('Done')
