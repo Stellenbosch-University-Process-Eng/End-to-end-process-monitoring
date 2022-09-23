@@ -33,10 +33,10 @@ function [r, t] = SupervisoryControl(r, m, y, t)
         % Special actions associated with this regime
         % Remove all fault flags from components after shut has been completed
         for i = 1:length(r.components.fields)
-            f = r.components.fields{i};
-            if r.components.(f).faultFlag
-                r.components.(f).faultFlag = false; % Remove maintenance flag after fixing error
-                r.components.(f).commision = t.time(end);  % Signal to fault modules the commission time of a component
+            cf = r.components.fields{i};
+            if r.components.(cf).faultFlag
+                r.components.(cf).faultFlag = false; % Remove maintenance flag after fixing error
+                r.components.(cf).commision = t.time(end);  % Signal to fault modules the commission time of a component
             end
         end
         

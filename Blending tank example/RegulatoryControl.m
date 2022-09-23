@@ -1,4 +1,4 @@
-function u = Control(u, y, r, t)
+function u = RegulatoryControl(u, y, r, t)
 u.F0 = r.components.valveF0.position;
 u.F = r.components.valveF.position;
 
