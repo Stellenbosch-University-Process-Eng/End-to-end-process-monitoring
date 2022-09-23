@@ -8,7 +8,23 @@ rng(1)
 t.dt = 1;       % s
 t.tmax = 6*3600;  % s, simulation time
 
-%% Process parameters
+%% Disturbance variables
+% Create stochastic inlet flowrate and concentrations over time
+F0 = 0; C0 = 0;
+tspan = 0: t.dt : t.tmax;
+for i = 2:length(tspan)
+    F0(i) = 0.99*F0(i-1) + 0.00015*randn;
+    C0(i) = 0.999*C0(i-1) + 0.005*randn;
+end
+F0 = F0 + 0.01; 
+C0 = C0 + 1;    
+
+d.F0 = griddedInterpolant(tspan, F0);
+d.C0 = griddedInterpolant(tspan, C0);
+clear F0 C0 tspan
+
+
+%% Process
 % Define process parameters
 x.parameters.A  = 0.5;     % m2, mixing tank cross-sectional area
 x.parameters.tau = 10;     % s, valve time constant
@@ -18,8 +34,10 @@ x.parameters.kv = 0.06;    % m2.5/s, drainage valve coefficient
 
 % List of state variables. Create an empty array for each state value,
 % which will be used in the Simulate function
-x.parameters.fields = {'m', 'V', 'xv', 'v'};
-x.parameters.intFields = {'C', 'L','FW', 'F0', 'F'};
+x.parameters.fields = {'m', 'V', 'xv', 'v'};            % Fields for state variables
+x.parameters.intFields = {'C', 'L','FW', 'F0', 'F'};    % Fields for intermediate variables
+
+% Create a structure with all variable fields empty, useful when calling ODEs
 for i = 1:length(x.parameters.fields)
     x.parameters.x_empty.(x.parameters.fields{i}) = [];
 end
@@ -110,24 +128,9 @@ m.hyperparam.SPE_threshold = 20;
 m.training = true;      % Determines if monitoring method is still trainign
 m.trainingTime = 2000;  % Time taken to train monitoring method
 
-% Current flags on any component
+% Current flags on any component. 
+% Alarms are passed to the supervisory control layer
 m.component.C.alarm = false;
-
-%% Disturbance variables
-
-% Create stochastic inlet flowrate and concentrations over time
-F0 = 0; C0 = 0;
-tspan = 0: t.dt : t.tmax;
-for i = 2:length(tspan)
-    F0(i) = 0.99*F0(i-1) + 0.00015*randn;
-    C0(i) = 0.999*C0(i-1) + 0.005*randn;
-end
-F0 = F0 + 0.01; 
-C0 = C0 + 1;    
-
-d.F0 = griddedInterpolant(tspan, F0);
-d.C0 = griddedInterpolant(tspan, C0);
-clear F0 C0 tspan
 
 %% Supervisory control
 r.components.fields = {'valveF0','valveFW','valveF', 'C','C0','F0','FW', 'F', 'L'};
@@ -166,13 +169,11 @@ for i = 1:length(x.parameters.intFields)
 end
 %% Integrate ODEs
 
-disp('Simulation started')
-
 t.time = 0;
 while t.time(end) < t.tmax
     t.time = [t.time t.time(end)+t.dt];
     
-    [r, t] = SupervisoryControl(r, m, y, t);
+    [r, t] = SupervisoryControl(r, m, y, t);    % Supervisory control can update "t" during "Shut"
     u = Control(u, y, r, t);
     x = Process(x, u, d, fp, t);
     fp = ProcessFault(fp, x, r, t);
