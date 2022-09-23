@@ -1,22 +1,22 @@
-function x = Process(x, u, d, fp, t)
+function x = Process(x, u, d, f, t)
 
 %     % Using ode45
 %     [~, xvec] = ode45(@(t, x) ODEs(t, x, y, sp, d, p), [t.Time(end-1) t.Time(end)], struct2vec(x, p));
     
     % Using hardcoded RK4
     x0 = struct2vec(x);          % Initial values as a vector
-    k1 = ODEs(t.time(end-1),          x0,             u, d, fp, x.parameters);
-    k2 = ODEs(t.time(end-1) + t.dt/2, x0 + t.dt/2*k1, u, d, fp, x.parameters);
-    k3 = ODEs(t.time(end-1) + t.dt/2, x0 + t.dt/2*k2, u, d, fp, x.parameters);
-    k4 = ODEs(t.time(end) ,           x0 + t.dt*k3,   u, d, fp, x.parameters);
+    k1 = ODEs(t.time(end-1),          x0,             u, d, f, x.parameters);
+    k2 = ODEs(t.time(end-1) + t.dt/2, x0 + t.dt/2*k1, u, d, f, x.parameters);
+    k3 = ODEs(t.time(end-1) + t.dt/2, x0 + t.dt/2*k2, u, d, f, x.parameters);
+    k4 = ODEs(t.time(end) ,           x0 + t.dt*k3,   u, d, f, x.parameters);
     xvec = (x0 + t.dt/6*(k1 + 2*k2 + 2*k3 + k4))';    % Transpose to generate row vector, as would be done using ode45
 
     % Generate the necessary structures
-    x = vec2struct(xvec(end,:), x, u, d, fp, t.time(end), x.parameters);
+    x = vec2struct(xvec(end,:), x, u, d, f, t.time(end), x.parameters);
 end
 
-function dxdt = ODEs(t, xvec, u, d, fp, p)
-    x = vec2struct(xvec, p.x_empty, u, d, fp, t, p);
+function dxdt = ODEs(t, xvec, u, d, f, p)
+    x = vec2struct(xvec, p.x_empty, u, d, f, t, p);
     
     ddt.m = d.C0(t)*x.F0 - x.C*x.F;
     ddt.V = x.F0 + x.FW - x.F;
@@ -36,7 +36,7 @@ function dxdt = ODEs(t, xvec, u, d, fp, p)
     dxdt = struct2vec(ddt);
 end
 
-function x = vec2struct(xvec, x, u, d, fp, t, p)
+function x = vec2struct(xvec, x, u, d, f, t, p)
     for i = 1:length(p.fields)
         x.(p.fields{i}) = [x.(p.fields{i}); xvec(i)];
     end

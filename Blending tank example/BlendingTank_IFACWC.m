@@ -4,11 +4,46 @@ clear
 clf
 rng(1)
 
-%% Time span
+%% Time span (t)
 t.dt = 1;       % s
 t.tmax = 6*3600;  % s, simulation time
 
-%% Process parameters
+%% Disturbance variables (d)
+% Create stochastic inlet flowrate and concentrations over time
+F0 = 0; C0 = 0;
+tspan = 0: t.dt : t.tmax;
+for i = 2:length(tspan)
+    F0(i) = 0.99*F0(i-1) + 0.00015*randn;
+    C0(i) = 0.999*C0(i-1) + 0.005*randn;
+end
+F0 = F0 + 0.01; 
+C0 = C0 + 1;    
+
+d.F0 = griddedInterpolant(tspan, F0);
+d.C0 = griddedInterpolant(tspan, C0);
+clear F0 C0 tspan
+
+%% Supervisory control (r)
+r.components.fields = {'valveF0','valveFW','valveF', 'C','C0','F0','FW', 'F', 'L'};
+for i = 1:length(r.components.fields)
+    r.components.(r.components.fields{i}).faultFlag = false;
+    r.components.(r.components.fields{i}).commision = 0;
+end
+
+r.Shutdown.period = 3600;   % s, length of a shut down
+r.Shutdown.levelThreshold = 0.001;   % m, level at which to switch from "Shutdown" to "Shut"
+r.Startup.levelThreshold = 0.5;     % m, level at which to switch from "Startup" to "Running"
+r.Running.plannedMaintenancePeriod = 2*3600;  % s, time before planned maintenance
+r.Startup.time = 0;
+
+r.regime = 'PrepStartup';
+r.setpoints.C = nan;
+
+%% Regulatory control (u)
+u.PI.K = 0.1;      % m3/kg, controller gain
+u.PI.tauI = 10;    % s, controller time constant
+
+%% Process (x)
 % Define process parameters
 x.parameters.A  = 0.5;     % m2, mixing tank cross-sectional area
 x.parameters.tau = 10;     % s, valve time constant
@@ -18,15 +53,51 @@ x.parameters.kv = 0.06;    % m2.5/s, drainage valve coefficient
 
 % List of state variables. Create an empty array for each state value,
 % which will be used in the Simulate function
-x.parameters.fields = {'m', 'V', 'xv', 'v'};
-x.parameters.intFields = {'C', 'L','FW', 'F0', 'F'};
+x.parameters.fields = {'m', 'V', 'xv', 'v'};            % Fields for state variables
+x.parameters.intFields = {'C', 'L','FW', 'F0', 'F'};    % Fields for intermediate variables
+
+% Create a structure with all variable fields empty, useful when calling ODEs
 for i = 1:length(x.parameters.fields)
     x.parameters.x_empty.(x.parameters.fields{i}) = [];
 end
 for i = 1:length(x.parameters.intFields)
     x.parameters.x_empty.(x.parameters.intFields{i}) = [];
 end
-%% Measurement parameters
+
+
+%% Faults (f)
+% SENSOR FAULTS
+% Each measurement has an associated fault state, 
+% which may be "None", "Bias", "Drift" or "Stuck". 
+% Each sensor also has a drift rate associated with the "Drift" fault, 
+% such that the drift at time "t" is given by drift = drift_rate * (t - t(incipient fault))
+% The bias simply gives the amount by which the sensor is offset for the
+% "Bias" fault
+
+f.fields = {'C','C0','F0','FW', 'F', 'L'};
+% Faults for concentration measurement
+f.C.state = 'None';
+f.C.drift = 0;
+f.C.driftRate = 0.0001;
+f.C.bias = 0.2;
+
+% All other faults; none will be introduced for this example
+f.C0.state = 'None';
+f.F0.state = 'None';
+f.FW.state = 'None';
+f.F.state = 'None';
+f.L.state = 'None';
+f.KPI.state = 'None';
+
+% Parameters specifying when a fault might occur
+f.fault.time = 2185;
+f.fault.triggered = false;
+
+% PROCESS FAULTS
+% Initialize process fault
+f.valveFW.state = 'None';
+
+%% Measurement (y)
 % List of measurement variables
 % Each measurement has an associated function which is used to calculate
 % the measurement from the prcoess variables, as well as a noise variance
@@ -60,44 +131,12 @@ y.F.noiseVar = 0.002;
 
 % Initialize measurements
 for i = 1:length(y.fields)
-    f = y.fields{i};
-    y.(f).time = [];
-    y.(f).data = [];
+    y.(y.fields{i}).time = [];
+    y.(y.fields{i}).data = [];
 end
 
-%% Process faults (fp)
-% Initialize process fault
-fp.valveFW.state = 'None';
 
-%% Sensor faults (fs)
-% Each measurement has an associated fault state, 
-% which may be "None", "Bias", "Drift" or "Stuck". 
-% Each sensor also has a drift rate associated with the "Drift" fault, 
-% such that the drift at time "t" is given by drift = drift_rate * (t - t(incipient fault))
-% The bias simply gives the amount by which the sensor is offset for the
-% "Bias" fault
-
-fs.fields = y.fields;
-
-% Faults for concentration measurement
-fs.C.state = 'None';
-fs.C.drift = 0;
-fs.C.driftRate = 0.0001;
-fs.C.bias = 0.2;
-
-% All other faults; none will be introduced for this example
-fs.C0.state = 'None';
-fs.F0.state = 'None';
-fs.FW.state = 'None';
-fs.F.state = 'None';
-fs.L.state = 'None';
-fs.KPI.state = 'None';
-
-% Parameters specifying when a fault might occur
-fs.fault.time = 2185;
-fs.fault.triggered = false;
-
-%% Monitoring parameters
+%% Monitoring (m)
 % Measurements to include in monitoring model
 m.yFields = {'C','C0','F0','FW', 'F', 'L'};
 
@@ -110,74 +149,33 @@ m.hyperparam.SPE_threshold = 20;
 m.training = true;      % Determines if monitoring method is still trainign
 m.trainingTime = 2000;  % Time taken to train monitoring method
 
-% Current flags on any component
+% Current flags on any component. 
+% Alarms are passed to the supervisory control layer
 m.component.C.alarm = false;
-
-%% Disturbance variables
-
-% Create stochastic inlet flowrate and concentrations over time
-F0 = 0; C0 = 0;
-tspan = 0: t.dt : t.tmax;
-for i = 2:length(tspan)
-    F0(i) = 0.99*F0(i-1) + 0.00015*randn;
-    C0(i) = 0.999*C0(i-1) + 0.005*randn;
-end
-F0 = F0 + 0.01; 
-C0 = C0 + 1;    
-
-d.F0 = griddedInterpolant(tspan, F0);
-d.C0 = griddedInterpolant(tspan, C0);
-clear F0 C0 tspan
-
-%% Supervisory control
-r.components.fields = {'valveF0','valveFW','valveF', 'C','C0','F0','FW', 'F', 'L'};
-for i = 1:length(r.components.fields)
-    f = r.components.fields{i};
-    r.components.(f).faultFlag = false;
-    r.components.(f).commision = 0;
-end
-
-r.Shutdown.period = 3600;   % s, length of a shut down
-r.Shutdown.levelThreshold = 0.001;   % m, level at which to switch from "Shutdown" to "Shut"
-r.Startup.levelThreshold = 0.5;     % m, level at which to switch from "Startup" to "Running"
-r.Running.plannedMaintenancePeriod = 2*3600;  % s, time before planned maintenance
-r.Startup.time = 0;
-
-r.regime = 'PrepStartup';
-r.setpoints.C = nan;
-
-%% Regulatory control
-
-u.PI.K = 0.1;      % m3/kg, controller gain
-u.PI.tauI = 10;    % s, controller time constant
 
 %% Economic model
 econ.KPI.values = nan;
 econ.KPI.function = @(r, x) exp( -40*(x.C(end) - r.setpoints.C(end)).^2 );
-%% Initialize
+
+%% Simulate
 % Initialize the process state variables
 x.m = 0.5; % kg, initial solute concentration in tank
 x.V = 0.25;   % m3, initial liquid volume in tank
 x.xv = 0.5; % ~, initial fraction valve opening
 x.v = 0;   % 1/s, initial valve velocity
-
 for i = 1:length(x.parameters.intFields)
     x.(x.parameters.intFields{i}) = nan;
 end
-%% Integrate ODEs
-
-disp('Simulation started')
 
 t.time = 0;
 while t.time(end) < t.tmax
     t.time = [t.time t.time(end)+t.dt];
     
-    [r, t] = SupervisoryControl(r, m, y, t);
-    u = Control(u, y, r, t);
-    x = Process(x, u, d, fp, t);
-    fp = ProcessFault(fp, x, r, t);
-    fs = SensorFault(fs, x, r, t);
-    y = Measurement(y, x, d, fs, t);
+    [r, t] = SupervisoryControl(r, m, y, t);    % Supervisory control can update "t" during "Shut"
+    u = RegulatoryControl(u, y, r, t);
+    x = Process(x, u, d, f, t);
+    f = Fault(f, x, r, t);
+    y = Measurement(y, x, d, f, t);
     m = Monitoring(m, y, t);
     econ = Economic(econ, r, x);
 

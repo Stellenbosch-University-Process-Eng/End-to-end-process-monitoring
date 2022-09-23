@@ -3,8 +3,7 @@ function m = Monitoring(m, y, t)
     if (m.training) && (t.time(end) >= m.trainingTime)
         X = [];
         for i = 1:length(m.yFields)
-            f = m.yFields{i};
-            X = [X y.(f).data(110:end)']; % Remove the first part of transient data
+            X = [X y.(m.yFields{i}).data(110:end)']; % Remove the first part of transient data
         end
         
         % Center and scale data
@@ -33,8 +32,7 @@ function m = Monitoring(m, y, t)
     elseif ~m.training
         X = [];
         for i = 1:length(m.yFields)
-            f = m.yFields{i};
-            X = [X y.(f).data(end)]; 
+            X = [X y.(m.yFields{i}).data(end)]; 
         end
         X = (X - m.model.mX)./m.model.sX;
         

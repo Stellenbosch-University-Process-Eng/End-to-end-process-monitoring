@@ -1,21 +1,21 @@
 function y = Measurement(y, x, d, fs, t)
     for i = 1: length(y.fields)
-        f = y.fields{i};
-        current = y.(f).function(t.time(end), x, d) + y.(f).noiseVar*randn;
+        cf = y.fields{i};
+        current = y.(cf).function(t.time(end), x, d) + y.(cf).noiseVar*randn;
         
-        if strcmp(fs.(f).state, 'Stuck')
-            current = y.(f).data(end); 
+        if strcmp(fs.(cf).state, 'Stuck')
+            current = y.(cf).data(end); 
 
-        elseif strcmp(fs.(f).state, 'Drift')
-            current = current + fs.(f).drift;
+        elseif strcmp(fs.(cf).state, 'Drift')
+            current = current + fs.(cf).drift;
             
-        elseif strcmp(fs.(f).state, 'Bias')
-            current = current + fs.(f).bias;
+        elseif strcmp(fs.(cf).state, 'Bias')
+            current = current + fs.(cf).bias;
 
         end
 
-        y.(f).time = [y.(f).time t.time(end)];
-        y.(f).data = [y.(f).data current];
+        y.(cf).time = [y.(cf).time t.time(end)];
+        y.(cf).data = [y.(cf).data current];
     end
 end
 
