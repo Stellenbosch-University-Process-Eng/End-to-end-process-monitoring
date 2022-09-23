@@ -1,14 +1,18 @@
 function u = Control(u, y, r, t)
-u.F0 = r.Components.valveF.position;
-u.F = r.Components.valveF.position;
+u.F0 = r.components.valveF0.position;
+u.F = r.components.valveF.position;
 
-if r.Components.valveFW.position == -1   % Apply control
-    error = r.Setpoint.C - y.C.Data(end);
+if r.components.valveFW.position == -1   % Apply control
+    error = r.setpoints.C(end) - y.C.data(end);
     u.intError = u.intError + error*t.dt;
     u.xv = -u.PI.K*(error + u.intError/u.PI.tauI);
     
-else
-    u.xv = r.Components.valveFW.position;    % Will be either 0 (closed) or 1 (open)
+elseif r.components.valveFW.position == 0    % Will be either 0 (closed) or 1 (open)
+    u.xv = 0;
+    u.intError = 0;
+
+elseif r.components.valveFW.position == 1    % Will be either 0 (closed) or 1 (open)
+    u.xv = 1;
     u.intError = 0;
 
 end

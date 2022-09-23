@@ -6,21 +6,25 @@ rng(1)
 
 %% Time span
 t.dt = 1;       % s
-t.tmax = 7200;  % s, simulation time
+t.tmax = 6*3600;  % s, simulation time
 
 %% Process parameters
 % Define process parameters
 x.parameters.A  = 0.5;     % m2, mixing tank cross-sectional area
-x.parameters.tauI = 1;     % s, valve time constant
+x.parameters.tau = 10;     % s, valve time constant
 x.parameters.xi = 5;       % ~, valve damping coefficient
 x.parameters.cv = 0.1;     % m3/s, control valve coefficient
 x.parameters.kv = 0.06;    % m2.5/s, drainage valve coefficient
 
 % List of state variables. Create an empty array for each state value,
 % which will be used in the Simulate function
-x.fields = {'m', 'V', 'xv', 'v'};
-for i = 1:length(x.fields)
-    x.x_empty.(x.fields{i}) = [];
+x.parameters.fields = {'m', 'V', 'xv', 'v'};
+x.parameters.intFields = {'C', 'L','FW', 'F0', 'F'};
+for i = 1:length(x.parameters.fields)
+    x.parameters.x_empty.(x.parameters.fields{i}) = [];
+end
+for i = 1:length(x.parameters.intFields)
+    x.parameters.x_empty.(x.parameters.intFields{i}) = [];
 end
 %% Measurement parameters
 % List of measurement variables
@@ -28,46 +32,42 @@ end
 % the measurement from the prcoess variables, as well as a noise variance
 % which specifies the variance of the normally distruted noise added to
 % each measurement
-y.fields = {'C','C0','F0','FW', 'F', 'L', 'KPI'};
+y.fields = {'C','C0','F0','FW', 'F', 'L'};
 
 % Concentration in the tank
-y.C.function = @(t, x, sp, d) x.C(end);
-y.C.noise_var = 0.01;
+y.C.function = @(t, x, d) x.C(end);
+y.C.noiseVar = 0.01;
 
 % Inlet concentration
-y.C0.function = @(t, x, sp, d) d.C0(t);
-y.C0.noise_var = 0.01;
+y.C0.function = @(t, x, d) d.C0(t);
+y.C0.noiseVar = 0.01;
 
 % Inlet flowrate
-y.F0.function = @(t, x, sp, d) x.F0(end);
-y.F0.noise_var = 0.002;
+y.F0.function = @(t, x, d) x.F0(end);
+y.F0.noiseVar = 0.002;
 
 % Water flowrate
-y.FW.function = @(t, x, sp, d) x.FW(end);
-y.FW.noise_var = 0.002;
+y.FW.function = @(t, x, d) x.FW(end);
+y.FW.noiseVar = 0.002;
 
 % Liquid level
-y.L.function = @(t, x, sp, d) x.L(end);
-y.L.noise_var = 0.002;
+y.L.function = @(t, x, d) x.L(end);
+y.L.noiseVar = 0.002;
 
 % Outlet flowrate
-y.F.function = @(t, x, sp, d) x.F(end);
-y.F.noise_var = 0.002;
+y.F.function = @(t, x, d) x.F(end);
+y.F.noiseVar = 0.002;
 
-% Key performance indicator
-y.KPI.function = @(t, x, sp, d) exp( -40*(x.C(end) - sp.C(t)).^2 );
-y.KPI.noise_var = 0;
-    
 % Initialize measurements
 for i = 1:length(y.fields)
     f = y.fields{i};
-    y.(f).Time = [];
-    y.(f).Data = [];
+    y.(f).time = [];
+    y.(f).data = [];
 end
 
 %% Process faults (fp)
 % Initialize process fault
-fp.valve.state = 'None';
+fp.valveFW.state = 'None';
 
 %% Sensor faults (fs)
 % Each measurement has an associated fault state, 
@@ -82,7 +82,7 @@ fs.fields = y.fields;
 % Faults for concentration measurement
 fs.C.state = 'None';
 fs.C.drift = 0;
-fs.C.drift_rate = 0.0001;
+fs.C.driftRate = 0.0001;
 fs.C.bias = 0.2;
 
 % All other faults; none will be introduced for this example
@@ -99,7 +99,7 @@ fs.fault.triggered = false;
 
 %% Monitoring parameters
 % Measurements to include in monitoring model
-m.y_fields = {'C','C0','F0','FW', 'F', 'L'};
+m.yFields = {'C','C0','F0','FW', 'F', 'L'};
 
 % Model hyperparameters
 m.hyperparam.nComponents = 2;
@@ -107,99 +107,109 @@ m.hyperparam.T2_threshold = 30;
 m.hyperparam.SPE_threshold = 20;
 
 % Specify model training time
-m.Training = true;      % Determines if monitoring method is still trainign
+m.training = true;      % Determines if monitoring method is still trainign
 m.trainingTime = 2000;  % Time taken to train monitoring method
 
 % Current flags on any component
-m.Component.C.faultFlag = false;
+m.component.C.alarm = false;
 
 %% Disturbance variables
 
 % Create stochastic inlet flowrate and concentrations over time
-F0 = 0*t; C0 = 0*t;
-for i = 2:length(t)
+F0 = 0; C0 = 0;
+tspan = 0: t.dt : t.tmax;
+for i = 2:length(tspan)
     F0(i) = 0.99*F0(i-1) + 0.00015*randn;
     C0(i) = 0.999*C0(i-1) + 0.005*randn;
 end
 F0 = F0 + 0.01; 
 C0 = C0 + 1;    
 
-d.F0 = griddedInterpolant(t, F0);
-d.C0 = griddedInterpolant(t, C0);
-clear F0 C0
+d.F0 = griddedInterpolant(tspan, F0);
+d.C0 = griddedInterpolant(tspan, C0);
+clear F0 C0 tspan
 
 %% Supervisory control
-r.Components.fields = {'valveF0','valveFW','valveF', 'C','C0','F0','FW', 'F', 'L'};
-for i = 1:length(r.Components.fields)
-    f = r.Components.fields{i};
-    r.Components.(f).faultFlag = false;
-    r.Components.(f).commision = 0;
+r.components.fields = {'valveF0','valveFW','valveF', 'C','C0','F0','FW', 'F', 'L'};
+for i = 1:length(r.components.fields)
+    f = r.components.fields{i};
+    r.components.(f).faultFlag = false;
+    r.components.(f).commision = 0;
 end
 
-r.Shutdown.Period = 3600;   % s, length of a shut down
-r.Shutdown.levelThreshold = 0.01;   % m, level at which to switch from "Shutdown" to "Shut"
+r.Shutdown.period = 3600;   % s, length of a shut down
+r.Shutdown.levelThreshold = 0.001;   % m, level at which to switch from "Shutdown" to "Shut"
 r.Startup.levelThreshold = 0.5;     % m, level at which to switch from "Startup" to "Running"
-r.Running.plannedMaintenancePeriod = 7200;  % s, time before planned maintenance
-r.Regime = 'Startup';
-r.Startup.times = 0;
+r.Running.plannedMaintenancePeriod = 2*3600;  % s, time before planned maintenance
+r.Startup.time = 0;
+
+r.regime = 'PrepStartup';
+r.setpoints.C = nan;
 
 %% Regulatory control
+
 u.PI.K = 0.1;      % m3/kg, controller gain
 u.PI.tauI = 10;    % s, controller time constant
 
+%% Economic model
+econ.KPI.values = nan;
+econ.KPI.function = @(r, x) exp( -40*(x.C(end) - r.setpoints.C(end)).^2 );
 %% Initialize
 % Initialize the process state variables
 x.m = 0.5; % kg, initial solute concentration in tank
-x.V = 1;   % m3, initial liquid volume in tank
+x.V = 0.25;   % m3, initial liquid volume in tank
 x.xv = 0.5; % ~, initial fraction valve opening
 x.v = 0;   % 1/s, initial valve velocity
 
+for i = 1:length(x.parameters.intFields)
+    x.(x.parameters.intFields{i}) = nan;
+end
 %% Integrate ODEs
-% Initialize the simulation
-%y = initMeasurement(x, sp, d, p, y); % Initialize measurements
-shut = [];  % s, vector containing time values where plant was shut down
 
 disp('Simulation started')
 
-t.Time = 0;
-while t.Time(end) < t.tmax
-    t.Time = [t.Time t.Time(end)+t.dt];
+t.time = 0;
+while t.time(end) < t.tmax
+    t.time = [t.time t.time(end)+t.dt];
     
     [r, t] = SupervisoryControl(r, m, y, t);
     u = Control(u, y, r, t);
-    x = Process(x, u, d, fp, t, p);
-    fp = ProcessFault(fp, x, t);
-    fs = SensorFault(fs, x, t);
-    y = Measurement(y, x, fs, t);
+    x = Process(x, u, d, fp, t);
+    fp = ProcessFault(fp, x, r, t);
+    fs = SensorFault(fs, x, r, t);
+    y = Measurement(y, x, d, fs, t);
     m = Monitoring(m, y, t);
-    
-    disp(t.Time(end)/t.tmax)
+    econ = Economic(econ, r, x);
+
+    disp(t.time(end)/t.tmax)
 end
 disp('Done')
 
 %% Plot results
 subplot(2,2,1)
-plot(y.C.Time, y.C.Data, '.', ...
-     t, x.C, ...
-     t, sp.C(t),'k--', ...
-     t(faulty == 1), 0.35*ones(sum(faulty), 1),'|',...
+plot(y.C.time, y.C.data, '.', ...
+     t.time, x.C, '.', ...
+     t.time, r.setpoints.C,'k--', ...
+     t.time(m.components.C.alarm == 1), 0.35*ones(sum(m.components.C.alarm), 1),'r|',...
      'LineWidth', 2)
 xlabel('Time (s)'); ylabel('Concentration'); 
 legend('Measured C', 'Actual C', 'Set-point C','Location','best')
+axis([0 t.tmax 0 0.8])
 
 subplot(2,2,2)
-plot(y.KPI.Time, y.KPI.Data, 'LineWidth', 2)
-xlabel('Time'); ylabel('KPI');
+plot(t.time, x.L, '.')
+xlabel('Time'); ylabel('Liquid level');
+% plot(t.Time, econ.KPI.Values, 'LineWidth', 2)
+% xlabel('Time'); ylabel('KPI');
 
 subplot(2,2,3)
-plot(y.C0.Time, y.C0.Data,'.', ...
-     t, d.C0(t), 'LineWidth', 2)
+plot(y.C0.time, y.C0.data,'.', ...
+     t.time, d.C0(t.time),'.')
 xlabel('Time'); ylabel('C0');
 
 subplot(2,2,4)
-plot(y.F0.Time, y.F0.Data,'.', ...
-     t, d.F0(t), ...
-     y.FW.Time, y.FW.Data,'.', ...
-     t, v.FW, 'LineWidth', 2)
+plot(t.time,    x.F0, ...
+     t.time,    x.FW, ...
+     t.time,    x.F, 'LineWidth', 2)
 xlabel('Time'); ylabel('F');
-legend('Measured F0','True F0', 'Measured FW', 'True FW');
+legend('F0', 'FW', 'F');

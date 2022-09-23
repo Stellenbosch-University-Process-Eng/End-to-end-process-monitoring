@@ -1,3 +1,3 @@
 function fp = ProcessFault(fp, x, r, t)
-    fp.valve.state = 'None';
+    fp.valveFW.state = 'None';
 end

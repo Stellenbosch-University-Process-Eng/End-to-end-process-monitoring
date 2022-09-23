@@ -1,10 +1,10 @@
-function y = Measurement(y, x, fs, t)
+function y = Measurement(y, x, d, fs, t)
     for i = 1: length(y.fields)
         f = y.fields{i};
-        current = y.(f).function(t.Time(end), x, sp, d) + y.(f).noise_var*randn;
+        current = y.(f).function(t.time(end), x, d) + y.(f).noiseVar*randn;
         
         if strcmp(fs.(f).state, 'Stuck')
-            current = y.(f).Data(end); 
+            current = y.(f).data(end); 
 
         elseif strcmp(fs.(f).state, 'Drift')
             current = current + fs.(f).drift;
@@ -14,8 +14,8 @@ function y = Measurement(y, x, fs, t)
 
         end
 
-        y.(f).Time = [y.(f).Time t.Time(end)];
-        y.(f).Data = [y.(f).Data current];
+        y.(f).time = [y.(f).time t.time(end)];
+        y.(f).data = [y.(f).data current];
     end
 end
 
