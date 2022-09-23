@@ -1,14 +1,65 @@
-function [T, T2, SPE, faulty] = Monitoring(y, monitor)
-    X = [y.C.Data(end) y.C0.Data(end) y.F0.Data(end) y.FW.Data(end) y.F.Data(end) y.L.Data(end)];
-    X = (X - monitor.mX)./monitor.sX;
-    T = X*monitor.Q;
-    
-    T2 = T * monitor.iSig * T';
-    SPE = (X - T*monitor.Q') * (X - T*monitor.Q')';
-    
-    if (T2 > monitor.T2_threshold) || (SPE > monitor.SPE_threshold)
-        faulty = 1;
-    else
-        faulty = 0;
+function m = Monitoring(m, y, t)
+
+    if (m.training) && (t.time(end) >= m.trainingTime)
+        X = [];
+        for i = 1:length(m.yFields)
+            f = m.yFields{i};
+            X = [X y.(f).data(110:end)']; % Remove the first part of transient data
+        end
+        
+        % Center and scale data
+        m.model.mX = mean(X);
+        m.model.sX = std(X);
+        X = (X - m.model.mX)./m.model.sX;
+        
+        % Train PCA model
+        [m.model.Q, Sig] = eigs((X' * X)/length(X), m.hyperparam.nComponents);
+        m.model.iSig = inv(Sig);
+        
+        % Monitoring statistics
+        T = X*m.model.Q;
+        T2 = diag(T * m.model.iSig * T');
+        SPE = diag((X - T*m.model.Q') * (X - T*m.model.Q')');
+        
+        m.statistic.T = T;
+        m.statistic.T2 = T2;
+        m.statistic.SPE = SPE;
+
+        m.components.C.warning = zeros(1, length(m.statistic.T));
+        m.components.C.alarm = zeros(1, length(m.statistic.T));
+
+        m.training = false;
+        
+    elseif ~m.training
+        X = [];
+        for i = 1:length(m.yFields)
+            f = m.yFields{i};
+            X = [X y.(f).data(end)]; 
+        end
+        X = (X - m.model.mX)./m.model.sX;
+        
+        % Monitoring statistics
+        T = X*m.model.Q;
+        T2 = diag(T * m.model.iSig * T');
+        SPE = diag((X - T*m.model.Q') * (X - T*m.model.Q')');
+        
+        if (T2 > m.hyperparam.T2_threshold) || (SPE > m.hyperparam.SPE_threshold)
+            m.components.C.warning = [m.components.C.warning 1];
+        else
+            m.components.C.warning = [m.components.C.warning 0];
+        end
+
+        if (sum(m.components.C.warning(end-59:end)) / 60) > 0.8
+            m.components.C.alarm = [m.components.C.alarm 1];
+        else
+            m.components.C.alarm = [m.components.C.alarm 0];
+        end
+
+        m.statistic.T = [m.statistic.T; T];
+        m.statistic.T2 = [m.statistic.T2; T2];
+        m.statistic.SPE = [m.statistic.SPE; SPE];
+
     end
+
+
 end
