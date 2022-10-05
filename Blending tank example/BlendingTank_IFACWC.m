@@ -80,14 +80,14 @@ f.C.state = 'None';
 f.C.drift = 0;
 f.C.driftRate = 0.0001;
 f.C.bias = 0.2;
+f.C.RUL = 0;
 
 % All other faults; none will be introduced for this example
-f.C0.state = 'None';
-f.F0.state = 'None';
-f.FW.state = 'None';
-f.F.state = 'None';
-f.L.state = 'None';
-f.KPI.state = 'None';
+f.C0.state = 'None';  f.C0.p_fail = @(t) 0;
+f.F0.state = 'None';  f.F0.p_fail = @(t) 0;
+f.FW.state = 'None';  f.FW.p_fail = @(t) 0;
+f.F.state = 'None';   f.F.p_fail = @(t) 0;
+f.L.state = 'None';   f.L.p_fail = @(t) 0;
 
 % Parameters specifying when a fault might occur
 f.fault.time = 2185;
