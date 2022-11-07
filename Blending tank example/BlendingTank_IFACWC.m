@@ -3,7 +3,7 @@ clc
 clear
 clf
 rng(1)
-
+tic
 %% Time span (t)
 t.dt = 1;       % s
 t.tmax = 6*3600;  % s, simulation time
@@ -24,19 +24,25 @@ d.C0 = griddedInterpolant(tspan, C0);
 clear F0 C0 tspan
 
 %% Supervisory control (r)
-r.components.fields = {'valveF0','valveFW','valveF', 'C','C0','F0','FW', 'F', 'L'};
+r.components.fields = {'valveF0','valveFW','valveF', 'C',     'C0',    'F0',    'FW',    'F',     'L'};
+component_types     = {'Valve',  'Valve',  'Valve',  'Sensor','Sensor','Sensor','Sensor','Sensor','Sensor'};
 for i = 1:length(r.components.fields)
-    r.components.(r.components.fields{i}).faultFlag = false;
-    r.components.(r.components.fields{i}).commision = 0;
+    cf = r.components.fields{i}; % Current component field
+    r.components.(cf).type = component_types{i};
+    r.components.(cf).faultFlag = false; % Whether the component has been flagged as faulty
 end
+clear component_types
 
 r.Shutdown.period = 3600;   % s, length of a shut down
 r.Shutdown.levelThreshold = 0.001;   % m, level at which to switch from "Shutdown" to "Shut"
 r.Startup.levelThreshold = 0.5;     % m, level at which to switch from "Startup" to "Running"
-r.Running.plannedMaintenancePeriod = 2*3600;  % s, time before planned maintenance
 r.Startup.time = 0;
 
-r.regime = 'PrepStartup';
+r.regime = 'Startup'; % Operating regime when simulation starts
+
+r.plannedMaintenancePeriod = 2*3600;  % s, time before planned maintenance
+r.MaintenanceCycle = {'Valve', 'Sensor'}; % Cycle for planned maintenance actions
+r.PlannedShuts = 0; % Number of planned shuts that have occured (used to estimate position in cycle)
 r.setpoints.C = nan;
 
 %% Regulatory control (u)
@@ -66,41 +72,53 @@ end
 
 
 %% Faults (f)
-% SENSOR FAULTS
-% Each measurement has an associated fault state, 
-% which may be "None", "Bias", "Drift" or "Stuck". 
+% CDF for bathtub failure model: alpha ~ minimum probability for failure, L = max lifetime
+BathtubCDF = @(t, alpha, L) (16*(1-alpha)*(t/L-1/2).^5 + alpha*(t/L-1/2) + 1/2);
+f.fields = r.components.fields;
+
+% Each coomponent has an associated fault state, 
+% which may be "None", "Bias", "Drift" or "Stuck" for sensors,
+% and "None" or "Stuck" for valves
 % Each sensor also has a drift rate associated with the "Drift" fault, 
 % such that the drift at time "t" is given by drift = drift_rate * (t - t(incipient fault))
-% The bias simply gives the amount by which the sensor is offset for the
-% "Bias" fault
+% The bias simply gives the amount by which the sensor is offset for the "Bias" fault
 
-f.fields = {'C','C0','F0','FW', 'F', 'L'};
 % Faults for concentration measurement
-f.C.state = 'None';
+f.C.F = BathtubCDF(t, 0.05, 1e5); % CDF of failure rate; alpha ~ minimum probability for failure, L = max lifetime        
+f.C.fault_type = 'Drift';   % If a fault occurs, it will be a drift fault
 f.C.drift = 0;
 f.C.driftRate = 0.0001;
-f.C.bias = 0.2;
-f.C.RUL = 0;
 
-% All other faults; none will be introduced for this example
-f.C0.state = 'None';  f.C0.p_fail = @(t) 0;
-f.F0.state = 'None';  f.F0.p_fail = @(t) 0;
-f.FW.state = 'None';  f.FW.p_fail = @(t) 0;
-f.F.state = 'None';   f.F.p_fail = @(t) 0;
-f.L.state = 'None';   f.L.p_fail = @(t) 0;
+% All other sensor faults; none will be introduced for this example
+f.C0.F = @(t) 0; f.C0.fault_type = 'None';
+f.F0.F = @(t) 0; f.F0.fault_type = 'None';
+f.FW.F = @(t) 0; f.FW.fault_type = 'None';
+f.F.F = @(t) 0;  f.F.fault_type = 'None';
+f.L.F = @(t) 0;  f.L.fault_type = 'None';
 
-% Parameters specifying when a fault might occur
-f.fault.time = 2185;
-f.fault.triggered = false;
+% Valve faults
+f.valveF0.F = @(t) 0; f.valveF0.fault_type = 'None';
+f.valveFW.F = @(t) 0; f.valveFW.fault_type = 'None';
+f.valveF.F = @(t) 0;  f.valveF.fault_type = 'None';
 
-% PROCESS FAULTS
-% Initialize process fault
-f.valveFW.state = 'None';
+% Determine hazard function for each component, set initial fault state and commission time
+for i = 1: length(f.fields)
+    cf = f.fields{i};   % Current component field
+    % Hazard function for failure, see https://en.wikipedia.org/wiki/Failure_rate#Failure_rate_in_the_discrete_sense
+    % The component fails if a uniform random number between 0 and 1 is smaller than f.C.hazard(t)
+    f.(cf).hazard = @(t) ( f.C.F(t + t.dt) - f.C.F(t) ) / ( ( 1-f.C.F(t) ) * t.dt );
+
+    % Set all fault states initially equal to zero, and all commission times
+    % equal to zero
+    f.(cf).state = 'None';
+    f.(cf).commision = 0; 
+
+end
 
 %% Measurement (y)
 % List of measurement variables
 % Each measurement has an associated function which is used to calculate
-% the measurement from the prcoess variables, as well as a noise variance
+% the measurement from the process variables, as well as a noise variance
 % which specifies the variance of the normally distruted noise added to
 % each measurement
 y.fields = {'C','C0','F0','FW', 'F', 'L'};
@@ -172,13 +190,17 @@ while t.time(end) < t.tmax
     t.time = [t.time t.time(end)+t.dt];
     
     [r, t] = SupervisoryControl(r, m, y, t);    % Supervisory control can update "t" during "Shut"
-    u = RegulatoryControl(u, y, r, t);
-    x = Process(x, u, d, f, t);
-    f = Fault(f, x, r, t);
-    y = Measurement(y, x, d, f, t);
-    m = Monitoring(m, y, t);
-    econ = Economic(econ, r, x);
-
+    
+    if strcmp(r.regime, 'Shut')
+        [r, f] = Maintenance(r, f, t);
+    else
+        u = RegulatoryControl(u, y, r, t);
+        x = Process(x, u, d, f, t);
+        f = Fault(f, x, t);
+        y = Measurement(y, x, d, f, t);
+        m = Monitoring(m, y, t);
+        econ = Economic(econ, r, x);
+    end
     disp(t.time(end)/t.tmax)
 end
 disp('Done')
@@ -211,3 +233,4 @@ plot(t.time,    x.F0, ...
      t.time,    x.F, 'LineWidth', 2)
 xlabel('Time'); ylabel('F');
 legend('F0', 'FW', 'F');
+toc
