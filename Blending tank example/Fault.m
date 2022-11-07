@@ -15,6 +15,4 @@ function f = Fault(f, x, t)
         end
     end
 
-    % PROCESS FAULTS
-    f.valveFW.state = 'None';
 end
