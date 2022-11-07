@@ -76,7 +76,7 @@ end
 BathtubCDF = @(t, alpha, L) (16*(1-alpha)*(t/L-1/2).^5 + alpha*(t/L-1/2) + 1/2);
 f.fields = r.components.fields;
 
-% Each coomponent has an associated fault state, 
+% Each component has an associated fault state, 
 % which may be "None", "Bias", "Drift" or "Stuck" for sensors,
 % and "None" or "Stuck" for valves
 % Each sensor also has a drift rate associated with the "Drift" fault, 
@@ -84,7 +84,7 @@ f.fields = r.components.fields;
 % The bias simply gives the amount by which the sensor is offset for the "Bias" fault
 
 % Faults for concentration measurement
-f.C.F = BathtubCDF(t, 0.05, 1e5); % CDF of failure rate; alpha ~ minimum probability for failure, L = max lifetime        
+f.C.F = @(t) BathtubCDF(t, 0.05, 1e5); % CDF of failure rate; alpha ~ minimum probability for failure, L = max lifetime        
 f.C.fault_type = 'Drift';   % If a fault occurs, it will be a drift fault
 f.C.drift = 0;
 f.C.driftRate = 0.0001;
@@ -106,7 +106,7 @@ for i = 1: length(f.fields)
     cf = f.fields{i};   % Current component field
     % Hazard function for failure, see https://en.wikipedia.org/wiki/Failure_rate#Failure_rate_in_the_discrete_sense
     % The component fails if a uniform random number between 0 and 1 is smaller than f.C.hazard(t)
-    f.(cf).hazard = @(t) ( f.C.F(t + t.dt) - f.C.F(t) ) / ( ( 1-f.C.F(t) ) * t.dt );
+    f.(cf).hazard = @(time) ( f.C.F(time + t.dt) - f.C.F(time) ) / ( ( 1-f.C.F(time) ) * t.dt );
 
     % Set all fault states initially equal to zero, and all commission times
     % equal to zero
@@ -149,14 +149,22 @@ y.F.noiseVar = 0.002;
 
 % Initialize measurements
 for i = 1:length(y.fields)
-    y.(y.fields{i}).time = [];
-    y.(y.fields{i}).data = [];
+    y.(y.fields{i}).time = nan;
+    y.(y.fields{i}).data = nan;
 end
 
 
 %% Monitoring (m)
-% Measurements to include in monitoring model
+% m.yFields are the measurements which are used during monitoring, to
+% create a warning or an alarm
+% m.components.fields are the different components that may have an alarm
+% associated with it. For example, even though the component "valveFW"
+% isn't a measured variable, a specific combination of measurements may
+% indicate that the feed water valve is malfunctioning, which will yield an
+% alarm in m.components.valveFW
+
 m.yFields = {'C','C0','F0','FW', 'F', 'L'};
+m.components.fields = r.components.fields;
 
 % Model hyperparameters
 m.hyperparam.nComponents = 2;
@@ -167,9 +175,13 @@ m.hyperparam.SPE_threshold = 20;
 m.training = true;      % Determines if monitoring method is still trainign
 m.trainingTime = 2000;  % Time taken to train monitoring method
 
-% Current flags on any component. 
+% Current alarms or warnings on any component
 % Alarms are passed to the supervisory control layer
-m.component.C.alarm = false;
+for i = 1:length(m.components.fields)
+    cf = m.components.fields{i};
+    m.components.(cf).alarm = [];
+    m.components.(cf).warning = [];
+end
 
 %% Economic model
 econ.KPI.values = nan;
