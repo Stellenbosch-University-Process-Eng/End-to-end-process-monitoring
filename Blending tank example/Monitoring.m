@@ -5,7 +5,8 @@ function m = Monitoring(m, y, t)
 
         X = [];
         for i = 1:length(m.yFields)
-            X = [X y.(m.yFields{i}).data(110:end)']; % Remove the first part of transient data
+            % X = [X y.(m.yFields{i}).data(110:end)']; % Remove the first part of transient data
+            X(:,end+1) = y.(m.yFields{i}).data(110:end)'; % Remove the first part of transient data
         end
         
         % Center and scale data
@@ -40,7 +41,7 @@ function m = Monitoring(m, y, t)
         % Add the latest measurement
         X = [];
         for i = 1:length(m.yFields)
-            X = [X y.(m.yFields{i}).data(end)]; 
+            X(end+1) = y.(m.yFields{i}).data(end); 
         end
         X = (X - m.model.mX)./m.model.sX;
         
@@ -49,15 +50,15 @@ function m = Monitoring(m, y, t)
         T2 = diag(T * m.model.iSig * T');
         SPE = diag((X - T*m.model.Q') * (X - T*m.model.Q')');
         
-        m.statistic.T = [m.statistic.T; T];
-        m.statistic.T2 = [m.statistic.T2; T2];
-        m.statistic.SPE = [m.statistic.SPE; SPE];
+        m.statistic.T(end+1) = T;
+        m.statistic.T2(end+1) = T2;
+        m.statistic.SPE(end+1) = SPE;
 
         % Set all alarms / warning to zero at first
         for i = 1:length(m.components.fields)
             cf = m.components.fields{i};
-            m.components.(cf).warning = [m.components.(cf).warning 0];
-            m.components.(cf).alarm = [m.components.(cf).alarm 0];
+            m.components.(cf).warning(end+1) = 0;
+            m.components.(cf).alarm(end+1) = 0;
         end
                 
         

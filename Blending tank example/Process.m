@@ -40,11 +40,11 @@ function x = vec2struct(xvec, x, u, d, f, t, p)
     x.xv(end) = min(max(x.xv(end), 0), 1); % ~, valve fraction opening, limit between 0 and 1
 
     % Add intermediate variables to structure
-    x.C  = [x.C  x.m(end)/x.V(end)];
-    x.L  = [x.L  x.V(end)/p.A];
-    x.FW = [x.FW p.cv*x.xv(end)];
-    x.F0 = [x.F0 u.F0*d.F0(t)];
-    x.F  = [x.F  u.F*p.kv*real(sqrt(x.L(end)))];
+    x.C(end+1)  = x.m(end)/x.V(end);
+    x.L(end+1)  = x.V(end)/p.A;
+    x.FW(end+1) = p.cv*x.xv(end);
+    x.F0(end+1) = u.F0*d.F0(t);
+    x.F(end+1)  = u.F*p.kv*real(sqrt(x.L(end)));
 end
 
 function xvec = struct2vec(x)

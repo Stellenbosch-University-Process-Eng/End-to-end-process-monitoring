@@ -14,8 +14,8 @@ function y = Measurement(y, x, d, f, t)
 
         end
 
-        y.(cf).time = [y.(cf).time t.time(end)];
-        y.(cf).data = [y.(cf).data current];
+        y.(cf).time(end+1) = t.time(end);
+        y.(cf).data(end+1) = current;
     end
 end
 

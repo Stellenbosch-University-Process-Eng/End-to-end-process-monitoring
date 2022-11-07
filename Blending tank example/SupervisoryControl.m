@@ -14,7 +14,7 @@ function [r, t] = SupervisoryControl(r, m, y, t)
         r.components.valveF.position  = 0;
         
         % Set-points
-        r.setpoints.C = [r.setpoints.C nan];
+        r.setpoints.C(end+1) = nan;
     
         % Special actions associated with this regime
         % None for now
@@ -30,7 +30,7 @@ function [r, t] = SupervisoryControl(r, m, y, t)
         r.components.valveF.position  = 0;
         
         % Set-points
-        r.setpoints.C = [r.setpoints.C nan];
+        r.setpoints.C(end+1) = nan;
     
         % Special actions associated with this regime
         % None
@@ -47,7 +47,7 @@ function [r, t] = SupervisoryControl(r, m, y, t)
         r.components.valveF.position  = 1;
         
         % Set-points
-        r.setpoints.C = [r.setpoints.C 0.3];
+        r.setpoints.C(end+1) = 0.3;
     
         % Special actions associated with this regime
         % None for now.
@@ -56,7 +56,7 @@ function [r, t] = SupervisoryControl(r, m, y, t)
         if t.time(end) > (r.PlannedShuts + 1) * r.plannedMaintenancePeriod % Planned maintenance
             r.regime = 'Shutdown';
             r.ShutType = r.MaintenanceCycle{mod(r.PlannedShuts, length(r.MaintenanceCycle)) + 1};
-        
+            r.PlannedShuts = r.PlannedShuts + 1;
         elseif (t.time(end) - r.Startup.time(end) > 3600) % Check for component alarms
             for i = 1:length(r.components.fields)
                 cf = r.components.fields{i}; % Current component field
@@ -77,7 +77,7 @@ function [r, t] = SupervisoryControl(r, m, y, t)
         r.components.valveF.position  = 1;
         
         % Set-points
-        r.setpoints.C = [r.setpoints.C nan];
+        r.setpoints.C(end+1) = nan;
     
         % Special actions associated with this regime: 
         % move time forward fir the duration of the shutdown
