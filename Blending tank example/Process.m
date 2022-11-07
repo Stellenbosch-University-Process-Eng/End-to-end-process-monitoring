@@ -1,9 +1,6 @@
 function x = Process(x, u, d, f, t)
 
-%     % Using ode45
-%     [~, xvec] = ode45(@(t, x) ODEs(t, x, y, sp, d, p), [t.Time(end-1) t.Time(end)], struct2vec(x, p));
-    
-    % Using hardcoded RK4
+   % Using hardcoded RK4
     x0 = struct2vec(x);          % Initial values as a vector
     k1 = ODEs(t.time(end-1),          x0,             u, d, f, x.parameters);
     k2 = ODEs(t.time(end-1) + t.dt/2, x0 + t.dt/2*k1, u, d, f, x.parameters);
