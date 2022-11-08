@@ -5,8 +5,8 @@ clf
 rng(2)
 tic
 %% Time span (t)
-t.dt = 600;       % s, timestep
-t.tmax = 24*7*24*3600;  % s, simulation time, equivalent to 24 weeks ~ 6 months
+t.dt = 100;       % s, timestep
+t.tmax = 2 *7*24*3600; % s, simulation time, aim for 24 weeks ~ 6 months
 
 % Pre-allocate for speed
 N = t.tmax / t.dt + 1;  % Max array size, if no shutdowns occur
@@ -15,8 +15,8 @@ t.time = NaN(N, 1); % Create column array of NaN values
 t.i = 1;    % Current time index
 %% Disturbance variables (d)
 % Create stochastic inlet flowrate and concentrations over time
-phi.F = 0.99;  sig.F = 0.001; mu.F = 0.01; F0 = mu.F;
-phi.C = 0.999; sig.C = 0.1;   mu.C = 1;    C0 = mu.C;
+phi.F = 0.99;  sig.F = 0.001; mu.F = 0.005; F0 = mu.F;
+phi.C = 0.999; sig.C = 0.1;   mu.C = 1;     C0 = mu.C;
 tspan = 0: t.dt : t.tmax;
 for i = 2:length(tspan)
     F0(i) = phi.F*F0(i-1) + sig.F*sqrt(1-phi.F^2)*randn + (1-phi.F)*mu.F;
@@ -62,15 +62,14 @@ u.PI.tauI = 10;    % s, controller time constant
 
 %% Process (x)
 % Define process parameters
-x.parameters.A  = 4;       % m2, mixing tank cross-sectional area
-x.parameters.tau = 60;     % s, valve time constant
-x.parameters.xi = 5;       % ~, valve damping coefficient
-x.parameters.cv = 0.1;     % m3/s, control valve coefficient
-x.parameters.kv = 0.06;    % m2.5/s, drainage valve coefficient
+x.parameters.A  = 4;     % m2, mixing tank cross-sectional area
+x.parameters.tau = 60;   % s, valve time constant
+x.parameters.cv = 0.025; % m3/s, control valve coefficient
+x.parameters.kv = 0.02;  % m2.5/s, drainage valve coefficient
 
 % List of state variables. Create an empty array for each state value,
 % which will be used in the Simulate function
-x.parameters.fields = {'m', 'V', 'xv', 'v'};            % Fields for state variables
+x.parameters.fields = {'m', 'V', 'xv'};            % Fields for state variables
 x.parameters.intFields = {'C', 'L','FW', 'F0', 'F'};    % Fields for intermediate variables
 
 % Create a structure with all variable fields empty, useful when calling ODEs
@@ -104,7 +103,7 @@ f.fields = r.components.fields;
 f.C.F = @(t) BathtubCDF(t, 0.05, 8*7*24*3600); % CDF of failure rate; alpha ~ minimum probability for failure, L = max lifetime        
 f.C.fault_type = 'Drift';   % If a fault occurs, it will be a drift fault
 f.C.drift = 0;
-f.C.driftRate = 0.0001;
+f.C.driftRate = 0.05 / (24*3600);
 
 % All other sensor faults; none will be introduced for this example
 f.C0.F = @(t) 0; f.C0.fault_type = 'None';
@@ -114,7 +113,7 @@ f.F.F = @(t) 0;  f.F.fault_type = 'None';
 f.L.F = @(t) 0;  f.L.fault_type = 'None';
 
 % Valve faults
-f.valveFW.F = @(t) BathtubCDF(t, 0.1, 8*7*24*3600); 
+f.valveFW.F = @(t) 0*BathtubCDF(t, 0.1, 8*7*24*3600); 
 f.valveFW.fault_type = 'Stuck';
 
 % All other valve faults; none will be introduced for this example
@@ -216,10 +215,9 @@ econ.KPI.function = @(r, x, idx) exp( -40*(x.C(idx) - r.setpoints.C(idx-1)).^2 )
 %% Initial conditions
 % Initialize the process state variables
 t.time(t.i) = 0;
-x.m(t.i) = 0.5; % kg, initial solute concentration in tank
-x.V(t.i) = 0.25;   % m3, initial liquid volume in tank
-x.xv(t.i) = 0.5; % ~, initial fraction valve opening
-x.v(t.i) = 0;   % 1/s, initial valve velocity
+x.m(t.i) = 0; % kg, initial solute concentration in tank
+x.V(t.i) = r.Shutdown.levelThreshold;   % m3, initial liquid volume in tank
+x.xv(t.i) = 0; % ~, initial fraction valve opening
 
 %% Simulate
 while t.time(t.i) < t.tmax
@@ -248,7 +246,7 @@ subplot(2,2,1)
 plot(y.C.time/3600, y.C.data, '.', ...
      t.time/3600, x.C, '.', ...
      t.time/3600, r.setpoints.C,'k--', ...
-     t.time(m.components.C.alarm == 1)/3600, -0.05*ones(sum(m.components.C.alarm, 'omitnan'), 1),'r|',...
+     t.time(m.components.C.alarm == 1)/3600, 0.01*ones(sum(m.components.C.alarm, 'omitnan'), 1),'r|',...
      'LineWidth', 2)
 xlabel('Time (s)'); ylabel('Concentration'); 
 legend('Measured C', 'Actual C', 'Set-point C','Location','best')
