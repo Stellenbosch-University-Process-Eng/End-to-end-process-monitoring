@@ -15,8 +15,8 @@ t.time = NaN(N, 1); % Create column array of NaN values
 t.i = 1;    % Current time index
 %% Disturbance variables (d)
 % Create stochastic inlet flowrate and concentrations over time
-phi.F = 0.99^t.dt;  sig.F = 0.001; mu.F = 0.01; F0 = mu.F;
-phi.C = 0.999^t.dt; sig.C = 0.1;   mu.C = 1;    C0 = mu.C;
+phi.F = 0.99;  sig.F = 0.001; mu.F = 0.01; F0 = mu.F;
+phi.C = 0.999; sig.C = 0.1;   mu.C = 1;    C0 = mu.C;
 tspan = 0: t.dt : t.tmax;
 for i = 2:length(tspan)
     F0(i) = phi.F*F0(i-1) + sig.F*sqrt(1-phi.F^2)*randn + (1-phi.F)*mu.F;
@@ -62,8 +62,8 @@ u.PI.tauI = 10;    % s, controller time constant
 
 %% Process (x)
 % Define process parameters
-x.parameters.A  = 0.5;     % m2, mixing tank cross-sectional area
-x.parameters.tau = 10;     % s, valve time constant
+x.parameters.A  = 4;       % m2, mixing tank cross-sectional area
+x.parameters.tau = 60;     % s, valve time constant
 x.parameters.xi = 5;       % ~, valve damping coefficient
 x.parameters.cv = 0.1;     % m3/s, control valve coefficient
 x.parameters.kv = 0.06;    % m2.5/s, drainage valve coefficient
