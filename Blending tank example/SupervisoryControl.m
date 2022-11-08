@@ -1,4 +1,4 @@
-function [r, t] = SupervisoryControl(r, m, y, t)
+function r = SupervisoryControl(r, m, y, t)
     % r consists of 
     %  Regime: specifies the current operating regime (Shut, Startup, Running, or Shutdown)
     %  components: provides details on sensors, actuators and other components
@@ -21,6 +21,7 @@ function [r, t] = SupervisoryControl(r, m, y, t)
 
         % Switching to next regime
         r.regime = 'Startup';
+        r.Startup.time(end+1) = t.time(end);
         
     elseif strcmp(r.regime, 'Startup')
         
@@ -57,6 +58,7 @@ function [r, t] = SupervisoryControl(r, m, y, t)
             r.regime = 'Shutdown';
             r.ShutType = r.MaintenanceCycle{mod(r.PlannedShuts, length(r.MaintenanceCycle)) + 1};
             r.PlannedShuts = r.PlannedShuts + 1;
+
         elseif (t.time(end) - r.Startup.time(end) > 3600) % Check for component alarms
             for i = 1:length(r.components.fields)
                 cf = r.components.fields{i}; % Current component field
@@ -80,9 +82,8 @@ function [r, t] = SupervisoryControl(r, m, y, t)
         r.setpoints.C(end+1) = nan;
     
         % Special actions associated with this regime: 
-        % move time forward fir the duration of the shutdown
-        t.time(end) = t.time(end) + r.Shutdown.period;
-        
+        % None for now
+
         % Switching to next regime
         if y.L.data(end) <= r.Shutdown.levelThreshold
             r.regime = 'Shut';
