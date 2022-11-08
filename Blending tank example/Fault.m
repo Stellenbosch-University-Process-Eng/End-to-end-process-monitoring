@@ -3,9 +3,12 @@ function f = Fault(f, x, t)
     for i = 1: length(f.fields)
         cf = f.fields{i};   % Current component field
         
+        % Increase the component's running time
+        f.(cf).RunTime = f.(cf).RunTime + t.dt;
+
         % Trigger faults according to the probability for failure defined
         % by hazard function
-        if rand < f.(cf).hazard(t.time(end))
+        if rand < f.(cf).hazard(f.(cf).RunTime)
            f.(cf).state = f.(cf).fault_type; 
         end
         

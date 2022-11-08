@@ -14,14 +14,14 @@ function r = SupervisoryControl(r, m, y, t)
         r.components.valveF.position  = 0;
         
         % Set-points
-        r.setpoints.C(end+1) = nan;
+        r.setpoints.C(t.i) = nan;
     
         % Special actions associated with this regime
         % None for now
 
         % Switching to next regime
         r.regime = 'Startup';
-        r.Startup.time(end+1) = t.time(end);
+        r.Startup.time(end+1) = t.time(t.i);
         
     elseif strcmp(r.regime, 'Startup')
         
@@ -31,13 +31,13 @@ function r = SupervisoryControl(r, m, y, t)
         r.components.valveF.position  = 0;
         
         % Set-points
-        r.setpoints.C(end+1) = nan;
+        r.setpoints.C(t.i) = nan;
     
         % Special actions associated with this regime
         % None
         
         % Switching to next regime
-        if y.L.data(end) >= r.Startup.levelThreshold
+        if y.L.data(t.i) >= r.Startup.levelThreshold
             r.regime = 'Running';
         end
         
@@ -48,21 +48,21 @@ function r = SupervisoryControl(r, m, y, t)
         r.components.valveF.position  = 1;
         
         % Set-points
-        r.setpoints.C(end+1) = 0.3;
+        r.setpoints.C(t.i) = r.Running.Csp;
     
         % Special actions associated with this regime
         % None for now.
         
         % Switching to next regime
-        if t.time(end) > (r.PlannedShuts + 1) * r.plannedMaintenancePeriod % Planned maintenance
+        if t.time(t.i) > (r.PlannedShuts + 1) * r.PlannedMaintenancePeriod % Planned maintenance
             r.regime = 'Shutdown';
             r.ShutType = r.MaintenanceCycle{mod(r.PlannedShuts, length(r.MaintenanceCycle)) + 1};
             r.PlannedShuts = r.PlannedShuts + 1;
 
-        elseif (t.time(end) - r.Startup.time(end) > 3600) % Check for component alarms
+        elseif (t.time(t.i) - r.Startup.time(end) > 3600) % Check for component alarms
             for i = 1:length(r.components.fields)
                 cf = r.components.fields{i}; % Current component field
-                if (m.components.(cf).alarm(end) == 1)  % If any component sounds an alarm...
+                if (m.components.(cf).alarm(t.i) == 1)  % If any component sounds an alarm...
                     r.components.(cf).faultFlag = true; % ...mark that component as faulty...
                     r.regime = 'Shutdown';              % ... and initiate unplanned maintenance
                     r.ShutType = 'Unplanned';
@@ -79,13 +79,13 @@ function r = SupervisoryControl(r, m, y, t)
         r.components.valveF.position  = 1;
         
         % Set-points
-        r.setpoints.C(end+1) = nan;
+        r.setpoints.C(t.i) = nan;
     
         % Special actions associated with this regime: 
         % None for now
 
         % Switching to next regime
-        if y.L.data(end) <= r.Shutdown.levelThreshold
+        if y.L.data(t.i) <= r.Shutdown.levelThreshold
             r.regime = 'Shut';
         end
         

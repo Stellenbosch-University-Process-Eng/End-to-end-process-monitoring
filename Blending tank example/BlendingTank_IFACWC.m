@@ -8,6 +8,10 @@ tic
 t.dt = 1;       % s
 t.tmax = 4*3600;  % s, simulation time, 8*3600 works well for now
 
+% Pre-allocate for speed
+N = t.tmax / t.dt + 1;  % Max array size, if no shutdowns occur
+t.time = NaN(N, 1); % Create column array of NaN values
+
 %% Disturbance variables (d)
 % Create stochastic inlet flowrate and concentrations over time
 F0 = 0; C0 = 0;
@@ -24,26 +28,33 @@ d.C0 = griddedInterpolant(tspan, C0);
 clear F0 C0 tspan
 
 %% Supervisory control (r)
+% Component specific parameters
 r.components.fields = {'valveF0','valveFW','valveF', 'C',     'C0',    'F0',    'FW',    'F',     'L'};
 component_types     = {'Valve',  'Valve',  'Valve',  'Sensor','Sensor','Sensor','Sensor','Sensor','Sensor'};
 for i = 1:length(r.components.fields)
     cf = r.components.fields{i}; % Current component field
     r.components.(cf).type = component_types{i};
     r.components.(cf).faultFlag = false; % Whether the component has been flagged as faulty
+    r.components.(cf).CheckComponentTime = 15*60;   % s, time taken to check component
+    r.components.(cf).ReplaceComponentTime = 30*60; % s, time taken to replace component
 end
 clear component_types
 
-r.Shutdown.period = 0.2*3600;   % s, length of a shut down
+% Maintenance parameters
+r.MinimumShutDownTime = 600;   % s, minimum shutdown period
+r.PlannedMaintenancePeriod = 3*3600;  % s, time before planned maintenance
+r.MaintenanceCycle = {'Valve', 'Sensor'}; % Cycle for planned maintenance actions
+r.PlannedShuts = 0; % Number of planned shuts that have occured (used to estimate position in cycle)
+
+% Regime specific parameters
 r.Shutdown.levelThreshold = 0.001;   % m, level at which to switch from "Shutdown" to "Shut"
 r.Startup.levelThreshold = 0.5;     % m, level at which to switch from "Startup" to "Running"
 r.Startup.time = 0;
+r.Running.Csp = 0.3;    % Concentration set-point during the "Running" regime
 
+% Initialize supervisory control
+r.setpoints.C = NaN(N,1);
 r.regime = 'Startup'; % Operating regime when simulation starts
-
-r.plannedMaintenancePeriod = 3*3600;  % s, time before planned maintenance
-r.MaintenanceCycle = {'Valve', 'Sensor'}; % Cycle for planned maintenance actions
-r.PlannedShuts = 0; % Number of planned shuts that have occured (used to estimate position in cycle)
-r.setpoints.C = nan;
 
 %% Regulatory control (u)
 u.PI.K = 0.1;      % m3/kg, controller gain
@@ -65,9 +76,15 @@ x.parameters.intFields = {'C', 'L','FW', 'F0', 'F'};    % Fields for intermediat
 % Create a structure with all variable fields empty, useful when calling ODEs
 for i = 1:length(x.parameters.fields)
     x.parameters.x_empty.(x.parameters.fields{i}) = [];
+    
+    % Pre-allocate for speed
+    x.(x.parameters.fields{i}) = NaN(N,1);
 end
 for i = 1:length(x.parameters.intFields)
     x.parameters.x_empty.(x.parameters.intFields{i}) = [];
+
+    % Pre-allocate for speed
+    x.(x.parameters.intFields{i}) = NaN(N,1);
 end
 
 
@@ -104,17 +121,16 @@ f.valveFW.fault_type = 'Stuck';
 f.valveF0.F = @(t) 0; f.valveF0.fault_type = 'None';
 f.valveF.F = @(t) 0;  f.valveF.fault_type = 'None';
 
-% Determine hazard function for each component, set initial fault state and commission time
+% Determine hazard function for each component, set initial fault state and run time
 for i = 1: length(f.fields)
     cf = f.fields{i};   % Current component field
     % Hazard function for failure, see https://en.wikipedia.org/wiki/Failure_rate#Failure_rate_in_the_discrete_sense
     % The component fails if a uniform random number between 0 and 1 is smaller than f.C.hazard(t)
     f.(cf).hazard = @(time) ( f.(cf).F(time + t.dt) - f.(cf).F(time) ) ./ ( ( 1-f.(cf).F(time) ) * t.dt );
 
-    % Set all fault states initially equal to zero, and all commission times
-    % equal to zero
+    % Set all component fault states and run times equal to zero
     f.(cf).state = 'None';
-    f.(cf).commision = 0; 
+    f.(cf).RunTime = 0; 
 
 end
 
@@ -127,33 +143,33 @@ end
 y.fields = {'C','C0','F0','FW', 'F', 'L'};
 
 % Concentration in the tank
-y.C.function = @(t, x, d) x.C(end);
+y.C.function = @(t, x, d, idx) x.C(idx);
 y.C.noiseVar = 0.01;
 
 % Inlet concentration
-y.C0.function = @(t, x, d) d.C0(t);
+y.C0.function = @(t, x, d, idx) d.C0(t);
 y.C0.noiseVar = 0.01;
 
 % Inlet flowrate
-y.F0.function = @(t, x, d) x.F0(end);
+y.F0.function = @(t, x, d, idx) x.F0(idx);
 y.F0.noiseVar = 0.002;
 
 % Water flowrate
-y.FW.function = @(t, x, d) x.FW(end);
+y.FW.function = @(t, x, d, idx) x.FW(idx);
 y.FW.noiseVar = 0.002;
 
 % Liquid level
-y.L.function = @(t, x, d) x.L(end);
+y.L.function = @(t, x, d, idx) x.L(idx);
 y.L.noiseVar = 0.002;
 
 % Outlet flowrate
-y.F.function = @(t, x, d) x.F(end);
+y.F.function = @(t, x, d, idx) x.F(idx);
 y.F.noiseVar = 0.002;
 
-% Initialize measurements
+% Initialize measurements (pre-allocate for speed)
 for i = 1:length(y.fields)
-    y.(y.fields{i}).time = nan;
-    y.(y.fields{i}).data = nan;
+    y.(y.fields{i}).time = NaN(N,1);
+    y.(y.fields{i}).data = NaN(N,1);
 end
 
 
@@ -174,36 +190,41 @@ m.hyperparam.nComponents = 2;
 m.hyperparam.T2_threshold = 30;
 m.hyperparam.SPE_threshold = 20;
 
-% Specify model training time
-m.training = true;      % Determines if monitoring method is still trainign
-m.trainingTime = 2000;  % Time taken to train monitoring method
-
 % Current alarms or warnings on any component
 % Alarms are passed to the supervisory control layer
+% Pre-allocate for speed
 for i = 1:length(m.components.fields)
     cf = m.components.fields{i};
-    m.components.(cf).alarm = [];
-    m.components.(cf).warning = [];
+    m.components.(cf).alarm = NaN(N,1);
+    m.components.(cf).warning = NaN(N,1);
 end
+
+% Specify model training time
+m.training = true;      % Determines if monitoring method is still training
+m.trainingTime = 2000;  % Time taken to train monitoring method
+
+% Pre-allocate for speed
+m.statistic.T = NaN(N, m.hyperparam.nComponents);
+m.statistic.T2 = NaN(N,1);
+m.statistic.SPE = NaN(N,1);
 
 %% Economic model
-econ.KPI.values = nan;
-econ.KPI.function = @(r, x) exp( -40*(x.C(end) - r.setpoints.C(end)).^2 );
+% Pre-allocate for speed
+econ.KPI.values = NaN(N,1);
+econ.KPI.function = @(r, x, idx) exp( -40*(x.C(idx) - r.setpoints.C(idx-1)).^2 );
+
+%% Initial conditions
+% Initialize the process state variables
+x.m(1) = 0.5; % kg, initial solute concentration in tank
+x.V(1) = 0.25;   % m3, initial liquid volume in tank
+x.xv(1) = 0.5; % ~, initial fraction valve opening
+x.v(1) = 0;   % 1/s, initial valve velocity
 
 %% Simulate
-% Initialize the process state variables
-x.m = 0.5; % kg, initial solute concentration in tank
-x.V = 0.25;   % m3, initial liquid volume in tank
-x.xv = 0.5; % ~, initial fraction valve opening
-x.v = 0;   % 1/s, initial valve velocity
-for i = 1:length(x.parameters.intFields)
-    x.(x.parameters.intFields{i}) = nan;
-end
-
-t.time = 0;
-tracking = [];
-while t.time(end) < t.tmax
-    t.time(end+1) = t.time(end)+t.dt;
+t.time(1) = 0;
+t.i = 1;
+while t.time(t.i) < t.tmax
+    t.time(t.i + 1) = t.time(t.i) + t.dt;
     
     r = SupervisoryControl(r, m, y, t);    
     if strcmp(r.regime, 'Shut')
@@ -214,16 +235,15 @@ while t.time(end) < t.tmax
     f = Fault(f, x, t);
     y = Measurement(y, x, d, f, t);
     m = Monitoring(m, y, r, t);
-    econ = Economic(econ, r, x);
-    disp(t.time(end)/t.tmax)
-
-    if strcmp(f.valveFW.state, 'None')
-        tracking(end+1) = 0;
-    else
-        tracking(end+1) = 1;
-    end
+    econ = Economic(econ, r, x, t);
+    disp(t.time(t.i)/t.tmax)
+    
+    t.i = t.i + 1;
 end
+t.time(t.time > t.tmax) = t.tmax;   % In the event that simulation ends with maintenance
 disp('Done')
+
+
 
 %% Plot results
 subplot(2,2,1)

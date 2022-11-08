@@ -1,4 +1,4 @@
-function econ = Economic(econ, r, x)
+function econ = Economic(econ, r, x, t)
 
 
-econ.KPI.values = [econ.KPI.values econ.KPI.function(r, x)];
+econ.KPI.values(t.i + 1) = econ.KPI.function(r, x, t.i+1);
