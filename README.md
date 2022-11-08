@@ -4,6 +4,8 @@ Simulation used to demonstrate end to end process monitoring, in preparation for
 To do:
 * Pre-allocate all arrays/structures for speed
 * Modify the dynamics to simulate realistic maintenance / failure time frames
+* Implement control charts as alternate monitoring method
+* Implement two different advisories
 * Separate "r" into a supervisory control signal "r" and a maintenance signal "q"
 * Split "r.components" into "r.Sensors" and "r.Valves". This will have the type built-in directly, and can be used to generalize the regulatory control module
 * Generalize the supervisory control module:
