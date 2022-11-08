@@ -25,6 +25,6 @@ function [r, f, t] = Maintenance(r, f, t)
     end
     
     % Move time forward for the duration of the shutdown (proportional to number of inspections)
-    t.time(t.i+1) = t.time(t.i) + ShutDownTime;
+    t.time(t.i+1) = min(t.time(t.i) + ShutDownTime, t.tmax); % Limit to maximum timepoint
     
 end
