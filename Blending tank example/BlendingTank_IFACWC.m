@@ -2,11 +2,11 @@
 clc
 clear
 clf
-rng(1)
+rng(2)
 tic
 %% Time span (t)
 t.dt = 1;       % s
-t.tmax = 6*3600;  % s, simulation time
+t.tmax = 4*3600;  % s, simulation time, 8*3600 works well for now
 
 %% Disturbance variables (d)
 % Create stochastic inlet flowrate and concentrations over time
@@ -33,14 +33,14 @@ for i = 1:length(r.components.fields)
 end
 clear component_types
 
-r.Shutdown.period = 3600;   % s, length of a shut down
+r.Shutdown.period = 0.2*3600;   % s, length of a shut down
 r.Shutdown.levelThreshold = 0.001;   % m, level at which to switch from "Shutdown" to "Shut"
 r.Startup.levelThreshold = 0.5;     % m, level at which to switch from "Startup" to "Running"
 r.Startup.time = 0;
 
 r.regime = 'Startup'; % Operating regime when simulation starts
 
-r.plannedMaintenancePeriod = 2*3600;  % s, time before planned maintenance
+r.plannedMaintenancePeriod = 3*3600;  % s, time before planned maintenance
 r.MaintenanceCycle = {'Valve', 'Sensor'}; % Cycle for planned maintenance actions
 r.PlannedShuts = 0; % Number of planned shuts that have occured (used to estimate position in cycle)
 r.setpoints.C = nan;
@@ -84,7 +84,7 @@ f.fields = r.components.fields;
 % The bias simply gives the amount by which the sensor is offset for the "Bias" fault
 
 % Faults for concentration measurement
-f.C.F = @(t) BathtubCDF(t, 0.05, 1e5); % CDF of failure rate; alpha ~ minimum probability for failure, L = max lifetime        
+f.C.F = @(t) BathtubCDF(t, 0.05, 1.6e4); % CDF of failure rate; alpha ~ minimum probability for failure, L = max lifetime        
 f.C.fault_type = 'Drift';   % If a fault occurs, it will be a drift fault
 f.C.drift = 0;
 f.C.driftRate = 0.0001;
@@ -97,8 +97,11 @@ f.F.F = @(t) 0;  f.F.fault_type = 'None';
 f.L.F = @(t) 0;  f.L.fault_type = 'None';
 
 % Valve faults
+f.valveFW.F = @(t) BathtubCDF(t, 0.1, 2*3600); 
+f.valveFW.fault_type = 'Stuck';
+
+% All other valve faults; none will be introduced for this example
 f.valveF0.F = @(t) 0; f.valveF0.fault_type = 'None';
-f.valveFW.F = @(t) 0; f.valveFW.fault_type = 'None';
 f.valveF.F = @(t) 0;  f.valveF.fault_type = 'None';
 
 % Determine hazard function for each component, set initial fault state and commission time
@@ -106,7 +109,7 @@ for i = 1: length(f.fields)
     cf = f.fields{i};   % Current component field
     % Hazard function for failure, see https://en.wikipedia.org/wiki/Failure_rate#Failure_rate_in_the_discrete_sense
     % The component fails if a uniform random number between 0 and 1 is smaller than f.C.hazard(t)
-    f.(cf).hazard = @(time) ( f.C.F(time + t.dt) - f.C.F(time) ) / ( ( 1-f.C.F(time) ) * t.dt );
+    f.(cf).hazard = @(time) ( f.(cf).F(time + t.dt) - f.(cf).F(time) ) ./ ( ( 1-f.(cf).F(time) ) * t.dt );
 
     % Set all fault states initially equal to zero, and all commission times
     % equal to zero
@@ -198,51 +201,56 @@ for i = 1:length(x.parameters.intFields)
 end
 
 t.time = 0;
+tracking = [];
 while t.time(end) < t.tmax
-    t.time = [t.time t.time(end)+t.dt];
+    t.time(end+1) = t.time(end)+t.dt;
     
-    [r, t] = SupervisoryControl(r, m, y, t);    % Supervisory control can update "t" during "Shut"
-    
+    r = SupervisoryControl(r, m, y, t);    
     if strcmp(r.regime, 'Shut')
-        [r, f] = Maintenance(r, f, t);
-    else
-        u = RegulatoryControl(u, y, r, t);
-        x = Process(x, u, d, f, t);
-        f = Fault(f, x, t);
-        y = Measurement(y, x, d, f, t);
-        m = Monitoring(m, y, t);
-        econ = Economic(econ, r, x);
+        [r, f, t] = Maintenance(r, f, t);  % Maintenance can update "t" during "Shut"
     end
+    u = RegulatoryControl(u, y, r, t);
+    x = Process(x, u, d, f, t);
+    f = Fault(f, x, t);
+    y = Measurement(y, x, d, f, t);
+    m = Monitoring(m, y, r, t);
+    econ = Economic(econ, r, x);
     disp(t.time(end)/t.tmax)
+
+    if strcmp(f.valveFW.state, 'None')
+        tracking(end+1) = 0;
+    else
+        tracking(end+1) = 1;
+    end
 end
 disp('Done')
 
 %% Plot results
 subplot(2,2,1)
-plot(y.C.time, y.C.data, '.', ...
-     t.time, x.C, '.', ...
-     t.time, r.setpoints.C,'k--', ...
-     t.time(m.components.C.alarm == 1), 0.35*ones(sum(m.components.C.alarm), 1),'r|',...
+plot(y.C.time/3600, y.C.data, '.', ...
+     t.time/3600, x.C, '.', ...
+     t.time/3600, r.setpoints.C,'k--', ...
+     t.time(m.components.C.alarm == 1)/3600, 0.35*ones(sum(m.components.C.alarm), 1),'r|',...
      'LineWidth', 2)
 xlabel('Time (s)'); ylabel('Concentration'); 
 legend('Measured C', 'Actual C', 'Set-point C','Location','best')
-axis([0 t.tmax 0 0.8])
+axis([0 t.tmax/3600 0 0.8])
 
 subplot(2,2,2)
-plot(t.time, x.L, '.')
+plot(t.time/3600, x.L, '.')
 xlabel('Time'); ylabel('Liquid level');
 % plot(t.Time, econ.KPI.Values, 'LineWidth', 2)
 % xlabel('Time'); ylabel('KPI');
 
 subplot(2,2,3)
-plot(y.C0.time, y.C0.data,'.', ...
-     t.time, d.C0(t.time),'.')
+plot(y.C0.time/3600, y.C0.data,'.', ...
+     t.time/3600, d.C0(t.time),'.')
 xlabel('Time'); ylabel('C0');
 
 subplot(2,2,4)
-plot(t.time,    x.F0, ...
-     t.time,    x.FW, ...
-     t.time,    x.F, 'LineWidth', 2)
+plot(t.time/3600,    x.F0, ...
+     t.time/3600,    x.FW, ...
+     t.time/3600,    x.F, 'LineWidth', 2)
 xlabel('Time'); ylabel('F');
 legend('F0', 'FW', 'F');
 toc
