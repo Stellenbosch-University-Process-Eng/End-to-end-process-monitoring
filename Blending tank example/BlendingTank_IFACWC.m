@@ -12,6 +12,7 @@ t.tmax = 4*3600;  % s, simulation time, 8*3600 works well for now
 N = t.tmax / t.dt + 1;  % Max array size, if no shutdowns occur
 t.time = NaN(N, 1); % Create column array of NaN values
 
+t.i = 1;    % Current time index
 %% Disturbance variables (d)
 % Create stochastic inlet flowrate and concentrations over time
 F0 = 0; C0 = 0;
@@ -215,14 +216,13 @@ econ.KPI.function = @(r, x, idx) exp( -40*(x.C(idx) - r.setpoints.C(idx-1)).^2 )
 
 %% Initial conditions
 % Initialize the process state variables
-x.m(1) = 0.5; % kg, initial solute concentration in tank
-x.V(1) = 0.25;   % m3, initial liquid volume in tank
-x.xv(1) = 0.5; % ~, initial fraction valve opening
-x.v(1) = 0;   % 1/s, initial valve velocity
+t.time(t.i) = 0;
+x.m(t.i) = 0.5; % kg, initial solute concentration in tank
+x.V(t.i) = 0.25;   % m3, initial liquid volume in tank
+x.xv(t.i) = 0.5; % ~, initial fraction valve opening
+x.v(t.i) = 0;   % 1/s, initial valve velocity
 
 %% Simulate
-t.time(1) = 0;
-t.i = 1;
 while t.time(t.i) < t.tmax
     t.time(t.i + 1) = t.time(t.i) + t.dt;
     
@@ -240,7 +240,6 @@ while t.time(t.i) < t.tmax
     
     t.i = t.i + 1;
 end
-t.time(t.time > t.tmax) = t.tmax;   % In the event that simulation ends with maintenance
 disp('Done')
 
 
