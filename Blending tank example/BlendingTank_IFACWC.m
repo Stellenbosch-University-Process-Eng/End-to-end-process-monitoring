@@ -5,8 +5,8 @@ clf
 rng(2)
 tic
 %% Time span (t)
-t.dt = 1;       % s
-t.tmax = 4*3600;  % s, simulation time, 8*3600 works well for now
+t.dt = 600;       % s, timestep
+t.tmax = 24*7*24*3600;  % s, simulation time, equivalent to 24 weeks ~ 6 months
 
 % Pre-allocate for speed
 N = t.tmax / t.dt + 1;  % Max array size, if no shutdowns occur
@@ -15,14 +15,13 @@ t.time = NaN(N, 1); % Create column array of NaN values
 t.i = 1;    % Current time index
 %% Disturbance variables (d)
 % Create stochastic inlet flowrate and concentrations over time
-F0 = 0; C0 = 0;
+phi.F = 0.99^t.dt;  sig.F = 0.001; mu.F = 0.01; F0 = mu.F;
+phi.C = 0.999^t.dt; sig.C = 0.1;   mu.C = 1;    C0 = mu.C;
 tspan = 0: t.dt : t.tmax;
 for i = 2:length(tspan)
-    F0(i) = 0.99*F0(i-1) + 0.00015*randn;
-    C0(i) = 0.999*C0(i-1) + 0.005*randn;
+    F0(i) = phi.F*F0(i-1) + sig.F*sqrt(1-phi.F^2)*randn + (1-phi.F)*mu.F;
+    C0(i) = phi.C*C0(i-1) + sig.C*sqrt(1-phi.C^2)*randn + (1-phi.C)*mu.C;
 end
-F0 = F0 + 0.01; 
-C0 = C0 + 1;    
 
 d.F0 = griddedInterpolant(tspan, F0);
 d.C0 = griddedInterpolant(tspan, C0);
@@ -36,14 +35,14 @@ for i = 1:length(r.components.fields)
     cf = r.components.fields{i}; % Current component field
     r.components.(cf).type = component_types{i};
     r.components.(cf).faultFlag = false; % Whether the component has been flagged as faulty
-    r.components.(cf).CheckComponentTime = 15*60;   % s, time taken to check component
-    r.components.(cf).ReplaceComponentTime = 30*60; % s, time taken to replace component
+    r.components.(cf).CheckComponentTime = 1*3600;   % s, time taken to check component
+    r.components.(cf).ReplaceComponentTime = 4*3600; % s, time taken to replace component
 end
 clear component_types
 
 % Maintenance parameters
-r.MinimumShutDownTime = 600;   % s, minimum shutdown period
-r.PlannedMaintenancePeriod = 3*3600;  % s, time before planned maintenance
+r.MinimumShutDownTime = 3*24*2600;   % s, minimum shutdown period, at least three days
+r.PlannedMaintenancePeriod = 4*7*24*3600;  % s, time before planned maintenance, every four weeks
 r.MaintenanceCycle = {'Valve', 'Sensor'}; % Cycle for planned maintenance actions
 r.PlannedShuts = 0; % Number of planned shuts that have occured (used to estimate position in cycle)
 
@@ -102,7 +101,7 @@ f.fields = r.components.fields;
 % The bias simply gives the amount by which the sensor is offset for the "Bias" fault
 
 % Faults for concentration measurement
-f.C.F = @(t) BathtubCDF(t, 0.05, 1.6e4); % CDF of failure rate; alpha ~ minimum probability for failure, L = max lifetime        
+f.C.F = @(t) BathtubCDF(t, 0.05, 8*7*24*3600); % CDF of failure rate; alpha ~ minimum probability for failure, L = max lifetime        
 f.C.fault_type = 'Drift';   % If a fault occurs, it will be a drift fault
 f.C.drift = 0;
 f.C.driftRate = 0.0001;
@@ -115,7 +114,7 @@ f.F.F = @(t) 0;  f.F.fault_type = 'None';
 f.L.F = @(t) 0;  f.L.fault_type = 'None';
 
 % Valve faults
-f.valveFW.F = @(t) BathtubCDF(t, 0.1, 2*3600); 
+f.valveFW.F = @(t) BathtubCDF(t, 0.1, 8*7*24*3600); 
 f.valveFW.fault_type = 'Stuck';
 
 % All other valve faults; none will be introduced for this example
@@ -202,7 +201,7 @@ end
 
 % Specify model training time
 m.training = true;      % Determines if monitoring method is still training
-m.trainingTime = 2000;  % Time taken to train monitoring method
+m.trainingTime = 7*24*3600;  % Time taken to train monitoring method, one week
 
 % Pre-allocate for speed
 m.statistic.T = NaN(N, m.hyperparam.nComponents);
@@ -249,7 +248,7 @@ subplot(2,2,1)
 plot(y.C.time/3600, y.C.data, '.', ...
      t.time/3600, x.C, '.', ...
      t.time/3600, r.setpoints.C,'k--', ...
-     t.time(m.components.C.alarm == 1)/3600, 0.35*ones(sum(m.components.C.alarm), 1),'r|',...
+     t.time(m.components.C.alarm == 1)/3600, -0.05*ones(sum(m.components.C.alarm, 'omitnan'), 1),'r|',...
      'LineWidth', 2)
 xlabel('Time (s)'); ylabel('Concentration'); 
 legend('Measured C', 'Actual C', 'Set-point C','Location','best')

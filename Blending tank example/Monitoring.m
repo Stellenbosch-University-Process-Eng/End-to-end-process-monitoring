@@ -31,8 +31,8 @@ function m = Monitoring(m, y, r, t)
         % Set current warnings / alarms
         for i = 1:length(m.components.fields)
             cf = m.components.fields{i};
-            m.components.(cf).warning = zeros(1, length(m.statistic.T));
-            m.components.(cf).alarm = zeros(1, length(m.statistic.T));
+            m.components.(cf).warning(1:t.i+1) = 0;
+            m.components.(cf).alarm(1:t.i+1) = 0;
         end
         m.training = false;
         
@@ -67,7 +67,7 @@ function m = Monitoring(m, y, r, t)
             m.components.C.warning(t.i+1) = 1;
         end
 
-        if (sum(m.components.C.warning(end-59:end)) / 60) > 0.8
+        if (sum(m.components.C.warning(t.i - 4: t.i+1)) / 6) > 0.8
             m.components.C.alarm(t.i+1) = 1;
         end
         
