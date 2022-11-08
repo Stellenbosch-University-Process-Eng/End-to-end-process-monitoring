@@ -1,4 +1,4 @@
-function m = Monitoring(m, y, t)
+function m = Monitoring(m, y, r, t)
 
     if (m.training) && (t.time(end) >= m.trainingTime)
         % Runs once, when training time is over
@@ -36,7 +36,7 @@ function m = Monitoring(m, y, t)
         end
         m.training = false;
         
-    elseif ~m.training
+    elseif (~m.training) && (strcmp(r.regime, 'Running'))
         
         % Add the latest measurement
         X = [];
@@ -50,7 +50,7 @@ function m = Monitoring(m, y, t)
         T2 = diag(T * m.model.iSig * T');
         SPE = diag((X - T*m.model.Q') * (X - T*m.model.Q')');
         
-        m.statistic.T(end+1) = T;
+        m.statistic.T(end+1,:) = T;
         m.statistic.T2(end+1) = T2;
         m.statistic.SPE(end+1) = SPE;
 
