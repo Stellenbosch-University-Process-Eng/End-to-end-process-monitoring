@@ -58,7 +58,15 @@ function r = SupervisoryControl(r, m, y, t)
         % None for now.
         
         % Switching to next regime
-        if t.time(t.i) > (r.PlannedShuts + 1) * r.PlannedMaintenancePeriod % Planned maintenance
+        if y.L.data(t.i) >= r.Running.levelInterlock % Flag all components following plant trip
+            r.regime = 'Shutdown';
+            r.ShutType = 'Unplanned';
+            for i = 1:length(r.components.fields)
+                cf = r.components.fields{i}; % Current component field
+                r.components.(cf).faultFlag = true; % ...mark that component as faulty...
+            end
+
+        elseif t.time(t.i) > (r.PlannedShuts + 1) * r.PlannedMaintenancePeriod % Planned maintenance
             r.regime = 'Shutdown';
             r.ShutType = r.MaintenanceCycle{mod(r.PlannedShuts, length(r.MaintenanceCycle)) + 1};
             r.PlannedShuts = r.PlannedShuts + 1;
