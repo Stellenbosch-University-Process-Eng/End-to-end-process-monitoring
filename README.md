@@ -9,4 +9,4 @@ To do:
 * Generalize the supervisory control module:
   * Define "r.Shut.FW.Position", then use "r.Valve.FW.Position = r.(r.regime).FW.Position", which will move the defintion of the regimes to the parameter deifnition phase
   * Let "r.setpoints.C(end+1) = r.(r.regime).setpoints.C" (same as above)
-* Generalize the monitoring module
+* Generalize the monitoring module and improve the overall monitoring methodology
