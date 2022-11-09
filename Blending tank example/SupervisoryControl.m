@@ -7,7 +7,8 @@ function r = SupervisoryControl(r, m, y, t)
     %  specifying the operation of the different operating regimes.
     
     if strcmp(r.regime, 'Shut')
-
+        r.regimeN = 1;
+        
         % Valve positions (0 = fully closed, 1 = fully open, -1 = controlled)
         r.components.valveFW.position = 0;
         r.components.valveF0.position = 0;
@@ -24,6 +25,7 @@ function r = SupervisoryControl(r, m, y, t)
         r.Startup.time(end+1) = t.time(t.i);
         
     elseif strcmp(r.regime, 'Startup')
+        r.regimeN = 2;
         
         % Valve positions (0 = fully closed, 1 = fully open, -1 = controlled)
         r.components.valveFW.position = 1;
@@ -42,6 +44,8 @@ function r = SupervisoryControl(r, m, y, t)
         end
         
     elseif strcmp(r.regime, 'Running')
+        r.regimeN = 3;
+        
         % Valve positions (0 = fully closed, 1 = fully open, -1 = controlled)
         r.components.valveFW.position = -1;
         r.components.valveF0.position = 1;
@@ -72,6 +76,7 @@ function r = SupervisoryControl(r, m, y, t)
         end
     
     elseif strcmp(r.regime, 'Shutdown')
+        r.regimeN = 4;
         
         % Valve positions (0 = fully closed, 1 = fully open, -1 = controlled)
         r.components.valveFW.position = 0;
