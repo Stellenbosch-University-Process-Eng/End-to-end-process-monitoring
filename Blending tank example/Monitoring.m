@@ -67,7 +67,10 @@ function m = Monitoring(m, y, r, t)
             m.components.C.warning(t.i+1) = 1;
         end
 
-        if (sum(m.components.C.warning(t.i - 4: t.i+1)) / 6) > 0.8
+        % ### Note the hard-coded values
+        alarm_w = 36;  % Monitoring window size
+        alarm_f = 0.8; % Fraction of warnings in window to sound alarm
+        if (sum(m.components.C.warning(t.i - alarm_w+2: t.i+1)) / alarm_w) > alarm_f
             m.components.C.alarm(t.i+1) = 1;
         end
         
