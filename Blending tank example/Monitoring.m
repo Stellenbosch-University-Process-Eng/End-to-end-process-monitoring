@@ -44,7 +44,7 @@ function m = Monitoring(m, y, r, t)
             m.components.(cf).alarm(t.i+1) = 0;
         end
 
-        if r.MonitoringActive
+        if m.MonitoringActive
         
             % Add the latest measurement
             X = NaN(1, length(m.yFields));
@@ -64,7 +64,7 @@ function m = Monitoring(m, y, r, t)
     
             % Check if the composition alarm tripped
             if (T2 > m.hyperparam.T2_threshold) || (SPE > m.hyperparam.SPE_threshold)
-                if abs(y.C.data(t.i+1) - m.model.mX(1)) > 2*m.model.sX(1) 
+                if abs(y.C.data(t.i+1) - m.model.mX(1)) < 2*m.model.sX(1) 
                     % If there is a problem, but the sensor reading is close to
                     % SP, then assume sensor is faulty...
                     m.components.C.warning(t.i+1) = 1;
@@ -85,11 +85,13 @@ function m = Monitoring(m, y, r, t)
             end
         
         else
-            if y.C.data(t.i+1) > (m.model.mX(1) - 4*m.model.sX(1))
-                r.MonitoringActive = true;
+            if y.C.data(t.i+1) > (m.model.mX(1) - 2*m.model.sX(1))
+                m.MonitoringActive = true;
             end
         end
-
+    elseif strcmp(r.regime,'Startup')
+        m.MonitoringActive = false;   % Provide time to get to Csp
+    
     end
 
 
