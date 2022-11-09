@@ -6,7 +6,7 @@ rng(2)
 tic
 %% Time span (t)
 t.dt = 100;       % s, timestep
-t.tmax = 4 *7*24*3600; % s, simulation time, aim for 24 weeks ~ 6 months
+t.tmax = 5 *7*24*3600; % s, simulation time, aim for 24 weeks ~ 6 months
 
 % Pre-allocate for speed
 N = t.tmax / t.dt + 1;  % Max array size, if no shutdowns occur
@@ -41,8 +41,8 @@ end
 clear component_types
 
 % Maintenance parameters
-r.MinimumShutDownTime = 3*24*2600;   % s, minimum shutdown period, at least three days
-r.PlannedMaintenancePeriod = 4*7*24*3600;  % s, time before planned maintenance, every four weeks
+r.MinimumShutDownTime = 1*24*2600;   % s, minimum shutdown period, at least three days
+r.PlannedMaintenancePeriod = 1*7*24*3600;  % s, time before planned maintenance, every four weeks
 r.MaintenanceCycle = {'Valve', 'Sensor'}; % Cycle for planned maintenance actions
 r.PlannedShuts = 0; % Number of planned shuts that have occured (used to estimate position in cycle)
 
@@ -51,7 +51,7 @@ r.Shutdown.levelThreshold = 0.001;   % m, level at which to switch from "Shutdow
 r.Startup.levelThreshold = 0.5;     % m, level at which to switch from "Startup" to "Running"
 r.Startup.time = 0;
 r.Running.Csp = 0.3;    % Concentration set-point during the "Running" regime
-
+r.Running.levelInterlock = 3; % m, level that trips process
 % Initialize supervisory control
 r.setpoints.C = NaN(N,1);
 r.regime = 'Startup'; % Operating regime when simulation starts
@@ -65,7 +65,7 @@ u.PI.tauI = 10;    % s, controller time constant
 x.parameters.A  = 4;     % m2, mixing tank cross-sectional area
 x.parameters.tau = 60;   % s, valve time constant
 x.parameters.cv = 0.025; % m3/s, control valve coefficient
-x.parameters.kv = 0.02;  % m2.5/s, drainage valve coefficient
+x.parameters.kv = 0.015;  % m2.5/s, drainage valve coefficient
 
 % List of state variables. Create an empty array for each state value,
 % which will be used in the Simulate function
@@ -100,7 +100,7 @@ f.fields = r.components.fields;
 % The bias simply gives the amount by which the sensor is offset for the "Bias" fault
 
 % Faults for concentration measurement
-f.C.F = @(t) BathtubCDF(t, 0.05, 8*7*24*3600); % CDF of failure rate; alpha ~ minimum probability for failure, L = max lifetime        
+f.C.F = @(t) BathtubCDF(t, 0.2, 3*7*24*3600); % CDF of failure rate; alpha ~ minimum probability for failure, L = max lifetime        
 f.C.fault_type = 'Drift';   % If a fault occurs, it will be a drift fault
 f.C.drift = 0;
 f.C.driftRate = 0.05 / (24*3600);
@@ -113,7 +113,7 @@ f.F.F = @(t) 0;  f.F.fault_type = 'None';
 f.L.F = @(t) 0;  f.L.fault_type = 'None';
 
 % Valve faults
-f.valveFW.F = @(t) 0*BathtubCDF(t, 0.1, 8*7*24*3600); 
+f.valveFW.F = @(t) BathtubCDF(t, 0.3, 1.8*7*24*3600); 
 f.valveFW.fault_type = 'Stuck';
 
 % All other valve faults; none will be introduced for this example
@@ -284,8 +284,15 @@ legend('F0', 'FW', 'F');
 axis([0 t.tmax/3600 0 1.2*max(x.F)])
 
 figure(2)
-subplot(2,1,1)
-plot(t.time/3600, faulty_sensor, t.time/3600, faulty_valve,'--','LineWidth',2)
 
-subplot(2,1,2)
-plot(t.time/3600, regime,'LineWidth',2)
+hold off
+plot(t.time/3600, faulty_sensor, ...
+     t.time/3600, faulty_valve, ...
+     'LineWidth', 2);
+hold on
+set(gca,'ColorOrderIndex',1);
+plot(t.time/3600, m.components.C.alarm,'x',...
+     t.time/3600, m.components.valveFW.alarm,'x',...
+     'LineWidth',2)
+
+plot(t.time/3600, regime/4,'k--','LineWidth',1)
