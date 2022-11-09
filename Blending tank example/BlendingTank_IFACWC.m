@@ -6,7 +6,7 @@ rng(2)
 tic
 %% Time span (t)
 t.dt = 100;       % s, timestep
-t.tmax = 2 *7*24*3600; % s, simulation time, aim for 24 weeks ~ 6 months
+t.tmax = 4 *7*24*3600; % s, simulation time, aim for 24 weeks ~ 6 months
 
 % Pre-allocate for speed
 N = t.tmax / t.dt + 1;  % Max array size, if no shutdowns occur
@@ -15,8 +15,8 @@ t.time = NaN(N, 1); % Create column array of NaN values
 t.i = 1;    % Current time index
 %% Disturbance variables (d)
 % Create stochastic inlet flowrate and concentrations over time
-phi.F = 0.99;  sig.F = 0.001; mu.F = 0.005; F0 = mu.F;
-phi.C = 0.999; sig.C = 0.1;   mu.C = 1;     C0 = mu.C;
+phi.F = 0.9;  sig.F = 0.001; mu.F = 0.005; F0 = mu.F;
+phi.C = 0.99; sig.C = 0.1;   mu.C = 1;     C0 = mu.C;
 tspan = 0: t.dt : t.tmax;
 for i = 2:length(tspan)
     F0(i) = phi.F*F0(i-1) + sig.F*sqrt(1-phi.F^2)*randn + (1-phi.F)*mu.F;
@@ -220,6 +220,9 @@ x.V(t.i) = r.Shutdown.levelThreshold;   % m3, initial liquid volume in tank
 x.xv(t.i) = 0; % ~, initial fraction valve opening
 
 %% Simulate
+faulty_sensor = NaN(N,1);
+faulty_valve = NaN(N,1);
+regime = NaN(N,1);
 while t.time(t.i) < t.tmax
     t.time(t.i + 1) = t.time(t.i) + t.dt;
     
@@ -233,15 +236,22 @@ while t.time(t.i) < t.tmax
     y = Measurement(y, x, d, f, t);
     m = Monitoring(m, y, r, t);
     econ = Economic(econ, r, x, t);
+    
+    % These terms are purely here to track true faults and regimes
+    faulty_sensor(t.i) = ~strcmp(f.C.state, 'None');
+    faulty_valve(t.i) = ~strcmp(f.valveFW.state, 'None');
+    regime(t.i) = r.regimeN;
+    
     disp(t.time(t.i)/t.tmax)
     
     t.i = t.i + 1;
 end
 disp('Done')
-
+toc
 
 
 %% Plot results
+figure(1)
 subplot(2,2,1)
 plot(y.C.time/3600, y.C.data, '.', ...
      t.time/3600, x.C, '.', ...
@@ -255,6 +265,7 @@ axis([0 t.tmax/3600 0 0.8])
 subplot(2,2,2)
 plot(t.time/3600, x.L, '.')
 xlabel('Time'); ylabel('Liquid level');
+axis([0 t.tmax/3600 0 1.2*max(x.L)])
 % plot(t.Time, econ.KPI.Values, 'LineWidth', 2)
 % xlabel('Time'); ylabel('KPI');
 
@@ -262,6 +273,7 @@ subplot(2,2,3)
 plot(y.C0.time/3600, y.C0.data,'.', ...
      t.time/3600, d.C0(t.time),'.')
 xlabel('Time'); ylabel('C0');
+axis([0 t.tmax/3600 0 1.2*max(y.C0.data)])
 
 subplot(2,2,4)
 plot(t.time/3600,    x.F0, ...
@@ -269,4 +281,11 @@ plot(t.time/3600,    x.F0, ...
      t.time/3600,    x.F, 'LineWidth', 2)
 xlabel('Time'); ylabel('F');
 legend('F0', 'FW', 'F');
-toc
+axis([0 t.tmax/3600 0 1.2*max(x.F)])
+
+figure(2)
+subplot(2,1,1)
+plot(t.time/3600, faulty_sensor, t.time/3600, faulty_valve,'--','LineWidth',2)
+
+subplot(2,1,2)
+plot(t.time/3600, regime,'LineWidth',2)
