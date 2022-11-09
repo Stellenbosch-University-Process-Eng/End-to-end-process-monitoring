@@ -41,6 +41,7 @@ function r = SupervisoryControl(r, m, y, t)
         % Switching to next regime
         if y.L.data(t.i) >= r.Startup.levelThreshold
             r.regime = 'Running';
+            r.MonitoringActive = false;   % Provide time to get to Csp
         end
         
     elseif strcmp(r.regime, 'Running')

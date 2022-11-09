@@ -48,7 +48,7 @@ r.PlannedShuts = 0; % Number of planned shuts that have occured (used to estimat
 
 % Regime specific parameters
 r.Shutdown.levelThreshold = 0.001;   % m, level at which to switch from "Shutdown" to "Shut"
-r.Startup.levelThreshold = 0.5;     % m, level at which to switch from "Startup" to "Running"
+r.Startup.levelThreshold = 1;     % m, level at which to switch from "Startup" to "Running"
 r.Startup.time = 0;
 r.Running.Csp = 0.3;    % Concentration set-point during the "Running" regime
 r.Running.levelInterlock = 3; % m, level that trips process
@@ -65,7 +65,7 @@ u.PI.tauI = 10;    % s, controller time constant
 x.parameters.A  = 4;     % m2, mixing tank cross-sectional area
 x.parameters.tau = 60;   % s, valve time constant
 x.parameters.cv = 0.025; % m3/s, control valve coefficient
-x.parameters.kv = 0.015;  % m2.5/s, drainage valve coefficient
+x.parameters.kv = 0.02;  % m2.5/s, drainage valve coefficient
 
 % List of state variables. Create an empty array for each state value,
 % which will be used in the Simulate function
@@ -186,8 +186,8 @@ m.components.fields = r.components.fields;
 
 % Model hyperparameters
 m.hyperparam.nComponents = 2;
-m.hyperparam.T2_threshold = 30;
-m.hyperparam.SPE_threshold = 20;
+m.hyperparam.T2_threshold = 20; % 30
+m.hyperparam.SPE_threshold = 20; % 20
 
 % Current alarms or warnings on any component
 % Alarms are passed to the supervisory control layer
@@ -291,7 +291,7 @@ plot(t.time/3600, faulty_sensor, ...
      'LineWidth', 2);
 hold on
 set(gca,'ColorOrderIndex',1);
-plot(t.time/3600, m.components.C.alarm,'x',...
+plot(t.time/3600, m.components.C.alarm,'o',...
      t.time/3600, m.components.valveFW.alarm,'x',...
      'LineWidth',2)
 
