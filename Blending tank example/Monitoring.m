@@ -64,7 +64,14 @@ function m = Monitoring(m, y, r, t)
         
         % Check if the composition alarm tripped
         if (T2 > m.hyperparam.T2_threshold) || (SPE > m.hyperparam.SPE_threshold)
-            m.components.C.warning(t.i+1) = 1;
+            if abs(y.C.data(t.i+1) - m.model.mX(1)) > 2*m.model.sX(1) 
+                % If there is a problem, but the sensor reading is close to
+                % SP, then assume sensor is faulty...
+                m.components.C.warning(t.i+1) = 1;
+            else
+                % ... else assume valve is faulty
+                m.components.valveFW.warning(t.i+1) = 1;
+            end
         end
 
         % ### Note the hard-coded values
@@ -72,6 +79,9 @@ function m = Monitoring(m, y, r, t)
         alarm_f = 0.8; % Fraction of warnings in window to sound alarm
         if (sum(m.components.C.warning(t.i - alarm_w+2: t.i+1)) / alarm_w) > alarm_f
             m.components.C.alarm(t.i+1) = 1;
+        end
+        if (sum(m.components.valveFW.warning(t.i - alarm_w+2: t.i+1)) / alarm_w) > alarm_f
+            m.components.valveFW.alarm(t.i+1) = 1;
         end
         
     end
