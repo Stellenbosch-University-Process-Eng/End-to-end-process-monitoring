@@ -100,7 +100,7 @@ f.fields = r.components.fields;
 % The bias simply gives the amount by which the sensor is offset for the "Bias" fault
 
 % Faults for concentration measurement
-f.C.F = @(t) BathtubCDF(t, 0.2, 3*7*24*3600); % CDF of failure rate; alpha ~ minimum probability for failure, L = max lifetime        
+f.C.F = @(t) BathtubCDF(t, 0.2, 2*7*24*3600); % CDF of failure rate; alpha ~ minimum probability for failure, L = max lifetime        
 f.C.fault_type = 'Drift';   % If a fault occurs, it will be a drift fault
 f.C.drift = 0;
 f.C.driftRate = 0.05 / (24*3600);
@@ -186,8 +186,8 @@ m.components.fields = r.components.fields;
 
 % Model hyperparameters
 m.hyperparam.nComponents = 2;
-m.hyperparam.T2_threshold = 20; % 30
-m.hyperparam.SPE_threshold = 20; % 20
+m.hyperparam.T2_threshold = 30;
+m.hyperparam.SPE_threshold = 20;
 
 % Current alarms or warnings on any component
 % Alarms are passed to the supervisory control layer
@@ -257,6 +257,7 @@ plot(y.C.time/3600, y.C.data, '.', ...
      t.time/3600, x.C, '.', ...
      t.time/3600, r.setpoints.C,'k--', ...
      t.time(m.components.C.alarm == 1)/3600, 0.01*ones(sum(m.components.C.alarm, 'omitnan'), 1),'r|',...
+     t.time(m.components.valveFW.alarm == 1)/3600, 0.01*ones(sum(m.components.valveFW.alarm, 'omitnan'), 1),'c|',...
      'LineWidth', 2)
 xlabel('Time (s)'); ylabel('Concentration'); 
 legend('Measured C', 'Actual C', 'Set-point C','Location','best')
