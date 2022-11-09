@@ -23,7 +23,8 @@ function dxdt = ODEs(t, xvec, u, d, f, p)
     % Check if valve is stuck, which is only an issue if controlled
     % If the valve is forced during startup / shutdown, a bypass can be used
     if (strcmp(f.valveFW.state, 'Stuck')) && (u.control)
-        ddt.xv = 0;
+        % ddt.xv = 0; % Stuck
+        ddt.xv = 1; % Fail open
     
     % Maintain fraction valve opening in [0, 1]
     elseif (x.xv == 0) && (ddt.xv < 0)
