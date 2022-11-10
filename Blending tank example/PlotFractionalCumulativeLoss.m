@@ -20,5 +20,5 @@ legend('Planned maintenance only', ...
 axis([0 t.tmax/3600/24 0.95 1.2])
 %a = gca(); a.YTick = a.YTick(a.YTick <= 1);
 
-saveas(gcf, ['Cumulative-Fractional-Loss-Gain', filename_version,'.fig'])
-saveas(gcf, ['Cumulative-Fractional-Loss-Gain', filename_version,'.tif'])
+saveas(gcf, ['../Figures/Cumulative-Fractional-Loss-Gain', filename_version,'.fig'])
+saveas(gcf, ['../Figures/Cumulative-Fractional-Loss-Gain', filename_version,'.tif'])

@@ -394,6 +394,6 @@ FaultShading(PlotFault);
 ShutDownShading(PlotShut);
 
 save(['Case',num2str(r.Case), filename_version]) 
-saveas(gcf, ['Process-Data-Case',num2str(r.Case), filename_version,'.fig'])
-saveas(gcf, ['Process-Data-Case',num2str(r.Case), filename_version,'.tif'])
+saveas(gcf, ['../Figures/Process-Data-Case',num2str(r.Case), filename_version,'.fig'])
+saveas(gcf, ['../Figures/Process-Data-Case',num2str(r.Case), filename_version,'.tif'])
 disp('Complete')
