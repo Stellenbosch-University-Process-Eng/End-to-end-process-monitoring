@@ -1,7 +1,7 @@
 %% Initialize
 clc
 clear
-rng(4)
+rng(3)
 tic
 
 %% Time span (t)
@@ -32,8 +32,8 @@ clear F0 C0 tspan
 %   1 - No Monitoring: completely ignore alarms, don't even flag components if alarm sounds
 %   2 - No unplanned maintenance: only replace flagged components at next planned maintenance
 %   3 - Unplanned maintenace: shut down plant and replace flagged components immediately
-r.Case = 3;
-filename_version = '-v4';
+r.Case = 1;
+filename_version = '-v5';
 
 % Component specific parameters
 r.components.fields = {'valveF0','valveFW','valveF', 'C',     'C0',    'F0',    'FW',    'F',     'L'};
@@ -48,7 +48,7 @@ end
 clear component_types
 
 % Maintenance parameters
-r.MinimumShutDownTime = 1*0*2600;   % s, minimum shutdown period
+r.MinimumShutDownTime = 0*24*3600;   % s, minimum shutdown period
 r.PlannedMaintenancePeriod = 1*7*24*3600;  % s, time before planned maintenance, every four weeks
 r.NextPlannedShut = r.PlannedMaintenancePeriod;
 r.MaintenanceCycle = {'Valve', 'Sensor'}; % Cycle for planned maintenance actions
@@ -124,7 +124,7 @@ f.F.F = @(t) 0;  f.F.fault_type = 'None';
 f.L.F = @(t) 0;  f.L.fault_type = 'None';
 
 % Valve faults
-f.valveFW.F = @(t) sign(r.Case)*BathtubCDF(t, 0.3, 11*24*3600); 
+f.valveFW.F = @(t) sign(r.Case)*BathtubCDF(t, 0.3, 13*24*3600); 
 f.valveFW.fault_type = 'Stuck';
 
 % All other valve faults; none will be introduced for this example
@@ -270,6 +270,10 @@ toc
 
 %% Plot results
 % Prepare functions / variables specific for plotting
+LoadCase = 3;
+filename_version = '-v5';
+load(['Case',num2str(LoadCase), filename_version])
+
 C1 = {'#d7191c','#2c7bb6'};
 C2 = {'#1b9e77','#d95f02','#7570b3'};
 
@@ -293,15 +297,9 @@ PlotFault.Text.C.t = t.time(PlotFault.idx.C)/3600/24;
 PlotFault.idx.FW = find( (faulty_valve(2:end) - faulty_valve(1:end-1)) > 0);
 PlotFault.Text.FW.t = t.time(PlotFault.idx.FW)/3600/24;
 
-if r.Case ~=1
-    PlotFault.Alarm.t = t.time(~isnan(t.time))/3600/24;
-    PlotFault.Alarm.C = m.components.C.alarm(~isnan(t.time));
-    PlotFault.Alarm.FW = m.components.valveFW.alarm(~isnan(t.time));
-else
-    PlotFault.Alarm.t = nan;
-    PlotFault.Alarm.C = nan;
-    PlotFault.Alarm.FW = nan;
-end
+PlotFault.Alarm.t = t.time(~isnan(t.time))/3600/24;
+PlotFault.Alarm.C = m.components.C.alarm(~isnan(t.time));
+PlotFault.Alarm.FW = m.components.valveFW.alarm(~isnan(t.time));
 
 %% Initial plots showing overall picture
 
@@ -362,18 +360,21 @@ clf
 colororder(C1)
 subplot(2,1,1)
 skip = 25;
-plot(t.time(1:skip:end)/3600/24, x.C(1:skip:end), '.', 'MarkerSize', 6);
+plot(t.time(1:skip:end)/3600/24, x.C(1:skip:end), '^', 'MarkerSize', 3);
 hold on
-plot(y.C.time(1:skip:end)/3600/24, y.C.data(1:skip:end), 'o', 'MarkerSize', 2);
+plot(y.C.time(1:skip:end)/3600/24, y.C.data(1:skip:end), 'o', 'MarkerSize', 3);
 plot(t.time/3600/24, r.setpoints.C,'k--', 'LineWidth', 1.5);
 ylabel('Concentration', 'Color','k')
 xlabel('Time (days)')
-axis([0 t.tmax/3600/24 -0.4 0.8])
+axis([0 t.tmax/3600/24 -0.6 0.8])
 a = gca(); a.YTick = 0:0.2:0.8;
-
 
 FaultShading(PlotFault);
 ShutDownShading(PlotShut);
+legend('True concentration', 'Measured concentration',...
+       '','Sensor fault', 'Sensor alarm',...
+       'Valve fault', 'Valve alarm',...
+       'Location','southwest')
 
 subplot(2,1,2)
 colororder(C2)
