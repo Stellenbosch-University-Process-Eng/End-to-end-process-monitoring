@@ -23,7 +23,9 @@ function r = SupervisoryControl(r, m, y, t)
         % Switching to next regime
         r.regime = 'Startup';
         r.Startup.time(end+1) = t.time(t.i);
-        
+        if ~strcmp(r.ShutType, 'Unplanned')
+            r.NextPlannedShut = t.time(t.i) + r.PlannedMaintenancePeriod;
+        end
     elseif strcmp(r.regime, 'Startup')
         r.regimeN = 2;
         
@@ -66,18 +68,22 @@ function r = SupervisoryControl(r, m, y, t)
                 r.components.(cf).faultFlag = true; % ...mark that component as faulty...
             end
 
-        elseif t.time(t.i) > (r.PlannedShuts + 1) * r.PlannedMaintenancePeriod % Planned maintenance
+        elseif t.time(t.i) > r.NextPlannedShut % Planned maintenance
             r.regime = 'Shutdown';
             r.ShutType = r.MaintenanceCycle{mod(r.PlannedShuts, length(r.MaintenanceCycle)) + 1};
             r.PlannedShuts = r.PlannedShuts + 1;
 
-        elseif (t.time(t.i) - r.Startup.time(end) > 3600) % Check for component alarms
+        elseif (t.time(t.i) - r.Startup.time(end) > 3600) ... % Check for component alarms
+            && (r.Case ~= 1) % r.Case = 1 reflects no monitoring system
             for i = 1:length(r.components.fields)
                 cf = r.components.fields{i}; % Current component field
                 if (m.components.(cf).alarm(t.i) == 1)  % If any component sounds an alarm...
                     r.components.(cf).faultFlag = true; % ...mark that component as faulty...
-                    r.regime = 'Shutdown';              % ... and initiate unplanned maintenance
-                    r.ShutType = 'Unplanned';
+                    
+                    if r.Case == 3  % r.Case = 3 reflects unplanned shutdowns following alarms
+                        r.regime = 'Shutdown';              % ... and initiate unplanned maintenance
+                        r.ShutType = 'Unplanned';
+                    end
                 end    
             end
             
