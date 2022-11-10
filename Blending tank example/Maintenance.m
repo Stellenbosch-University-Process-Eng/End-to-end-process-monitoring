@@ -7,9 +7,9 @@ function [r, f, t] = Maintenance(r, f, t)
     for i = 1:length(r.components.fields)
         cf = r.components.fields{i}; % Current component field
             
-        if r.components.(cf).faultFlag ...            % Check any flagged components, or
-        || strcmp(r.ShutType, r.components.(cf).type) % check components matching current planned maintenance type
-            
+        if r.components.(cf).faultFlag ...               % Check any flagged components, or
+        || strcmp(r.ShutType, r.components.(cf).type) ...% check components matching current planned maintenance type
+        || strcmp(r.ShutType, 'All')                     % All components checked time
             % Add the time taken to check component to shutdown time
             ShutDownTime = ShutDownTime + r.components.(cf).CheckComponentTime;
 

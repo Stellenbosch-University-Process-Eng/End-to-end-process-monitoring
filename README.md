@@ -2,7 +2,6 @@
 Simulation used to demonstrate end to end process monitoring, in preparation for IFAC World Congress 2023
 
 To do:
-* Modify the dynamics to simulate realistic maintenance / failure time frames
 * Implement control charts as alternate monitoring method
 * Implement two different advisories
 * Separate "r" into a supervisory control signal "r" and a maintenance signal "q"
@@ -10,4 +9,4 @@ To do:
 * Generalize the supervisory control module:
   * Define "r.Shut.FW.Position", then use "r.Valve.FW.Position = r.(r.regime).FW.Position", which will move the defintion of the regimes to the parameter deifnition phase
   * Let "r.setpoints.C(end+1) = r.(r.regime).setpoints.C" (same as above)
-* Generalize the monitoring module
+* Generalize the monitoring module and improve the overall monitoring methodology

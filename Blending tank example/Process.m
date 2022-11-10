@@ -18,22 +18,21 @@ function dxdt = ODEs(t, xvec, u, d, f, p)
     ddt.m = d.C0(t)*x.F0 - x.C*x.F;
     ddt.V = x.F0 + x.FW - x.F;
     
-    ddt.xv = x.v;
-    ddt.v = (1/p.tau^2)*(u.xv - x.xv) - 2*p.xi/p.tau*x.v;
+    ddt.xv = (u.xv - x.xv)/p.tau;
     
     % Check if valve is stuck, which is only an issue if controlled
     % If the valve is forced during startup / shutdown, a bypass can be used
     if (strcmp(f.valveFW.state, 'Stuck')) && (u.control)
-        ddt.xv = 0;
-        ddt.v = 0;
+        % ddt.xv = 0; % Stuck
+        ddt.xv = 10; % Fail open
+        % ddt.xv = (u.xv - x.xv)/(p.tau/10); % Wild behaviour
     
+
     % Maintain fraction valve opening in [0, 1]
-    elseif (x.xv == 0) && (ddt.v < 0)
+    elseif (x.xv == 0) && (ddt.xv < 0)
         ddt.xv = 0;
-        ddt.v = 0;
-    elseif (x.xv == 1) && (ddt.v > 0)
+    elseif (x.xv == 1) && (ddt.xv > 0)
         ddt.xv = 0;
-        ddt.v = 0;
     end
 
     ddt.parameters.fields = p.fields;

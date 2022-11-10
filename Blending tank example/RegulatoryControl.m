@@ -8,7 +8,7 @@ if r.components.valveFW.position == -1   % Apply control
     u.xv = -u.PI.K*(error + u.intError/u.PI.tauI);
     u.control = true;
 else   % Will be either 0 (closed) or 1 (open)
-    u.xv = r.components.valveFW.position;
+    u.xv = 0.5*r.components.valveFW.position;
     u.intError = 0;
     u.control = false;
 

@@ -8,7 +8,7 @@ function f = Fault(f, x, t)
 
         % Trigger faults according to the probability for failure defined
         % by hazard function
-        if rand < f.(cf).hazard(f.(cf).RunTime)
+        if (rand < f.(cf).hazard(f.(cf).RunTime)) || (f.(cf).hazard(f.(cf).RunTime) < 0)
            f.(cf).state = f.(cf).fault_type; 
         end
         
