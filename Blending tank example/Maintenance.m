@@ -1,6 +1,6 @@
 function [r, f, t] = Maintenance(r, f, t)
     % Perform maintenance for unplanned / planned shut downs
-    ShutDownTime = r.MinimumShutDownTime;
+    r.ShutDownTime = r.MinimumShutDownTime;
 
     % Cycle over all components to identify components requiring
     % replacement and to determine the total shutdown time
@@ -11,7 +11,7 @@ function [r, f, t] = Maintenance(r, f, t)
         || strcmp(r.ShutType, r.components.(cf).type) ...% check components matching current planned maintenance type
         || strcmp(r.ShutType, 'All')                     % All components checked time
             % Add the time taken to check component to shutdown time
-            ShutDownTime = ShutDownTime + r.components.(cf).CheckComponentTime;
+            r.ShutDownTime = r.ShutDownTime + r.components.(cf).CheckComponentTime;
 
             % Replace faulty components (regardless of flagged)
             if ~strcmp(f.(cf).state, 'None')
@@ -19,12 +19,12 @@ function [r, f, t] = Maintenance(r, f, t)
                 f.(cf).drift = 0; % Reset drift (if any)
                 f.(cf).RunTime = 0; % Reset the amount of time component has run
                 r.components.(cf).faultFlag = false; % remove the fault flag
-                ShutDownTime = ShutDownTime + r.components.(cf).ReplaceComponentTime;
+                r.ShutDownTime = r.ShutDownTime + r.components.(cf).ReplaceComponentTime;
             end
         end
     end
     
     % Move time forward for the duration of the shutdown (proportional to number of inspections)
-    t.time(t.i+1) = min(t.time(t.i) + ShutDownTime, t.tmax); % Limit to maximum timepoint
+    t.time(t.i+1) = min(t.time(t.i) + r.ShutDownTime, t.tmax); % Limit to maximum timepoint
     
 end
