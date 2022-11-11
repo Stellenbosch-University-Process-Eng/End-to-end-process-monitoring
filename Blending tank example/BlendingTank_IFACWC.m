@@ -32,7 +32,8 @@ clear F0 C0 tspan
 %   1 - No Monitoring: completely ignore alarms, don't even flag components if alarm sounds
 %   2 - No unplanned maintenance: only replace flagged components at next planned maintenance
 %   3 - Unplanned maintenace: shut down plant and replace flagged components immediately
-r.Case = 1;
+%   4 - Switch control regime and wait for planned maintenance
+r.Case = 3;
 filename_version = '-v5';
 
 % Component specific parameters
@@ -124,7 +125,7 @@ f.F.F = @(t) 0;  f.F.fault_type = 'None';
 f.L.F = @(t) 0;  f.L.fault_type = 'None';
 
 % Valve faults
-f.valveFW.F = @(t) sign(r.Case)*BathtubCDF(t, 0.3, 13*24*3600); 
+f.valveFW.F = @(t) sign(r.Case)*BathtubCDF(t, 0.3, 13.4*24*3600); 
 f.valveFW.fault_type = 'Stuck';
 
 % All other valve faults; none will be introduced for this example
@@ -270,12 +271,15 @@ toc
 
 %% Plot results
 % Prepare functions / variables specific for plotting
-LoadCase = 3;
-filename_version = '-v5';
-load(['Case',num2str(LoadCase), filename_version])
+
+% LoadCase = 3;
+% filename_version = '-v5';
+% load(['Case',num2str(LoadCase), filename_version])
 
 C1 = {'#d7191c','#2c7bb6'};
 C2 = {'#1b9e77','#d95f02','#7570b3'};
+
+set(groot, 'defaultAxesTickLabelInterpreter','latex'); set(groot, 'defaultLegendInterpreter','latex');
 
 PlotShut.Shade.t = t.time(~isnan(t.time))/3600/24;
 PlotShut.Shade.y = (regime(~isnan(t.time)) ~= 3);
