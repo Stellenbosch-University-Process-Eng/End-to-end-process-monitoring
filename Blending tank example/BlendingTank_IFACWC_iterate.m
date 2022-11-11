@@ -280,29 +280,58 @@ for k = 1:KK
 end
 
 %%
+C2 = {[27,158,119]/256, [217,95,2]/256, [117,112,179]/256};
+
+figure(5)
 clf
-C = {'k','r','b'};
-for j = 1:3
+figure(6)
+clf
+for j = 3:-1:1
     cKPI_mean{j} = mean(cKPI{j}.values, 1, 'omitnan');
     cKPI_std{j} = std(cKPI{j}.values, 1, 'omitnan');
 
     f_cKPI_mean{j} = mean(cKPI{j}.values./cKPI{1}.values, 1, 'omitnan');
     f_cKPI_std{j} = std(cKPI{j}.values./cKPI{1}.values, 1, 'omitnan');
 
-    figure(5)
-    plot(f_cKPI_mean{j}, C{j})
-    hold on
-    plot(f_cKPI_mean{j} + f_cKPI_std{j}, [C{j}, '--'])
-    plot(f_cKPI_mean{j} - f_cKPI_std{j}, [C{j}, '--'])
+%     figure(5)
+%     idx = find(  ( (~isnan(t.time).') .* (~isnan(f_cKPI_mean{j})) ) == 1  );
+%     fll = fill([t.time(idx)' fliplr(t.time(idx)')]/3600/24, ...
+%          [(f_cKPI_mean{j}(idx) + f_cKPI_std{j}(idx)) ...
+%           fliplr((f_cKPI_mean{j}(idx) - f_cKPI_std{j}(idx)))], ...
+%          C2{j});
+%     fll.FaceAlpha = 0.1; fll.EdgeColor = 'none'
+%     hold on
+%     plot(t.time/3600/24, f_cKPI_mean{j}, 'Color', C2{j}, 'LineWidth', 1.5)
+    
 
     figure(6)
-    plot(cKPI_mean{j}, C{j})
+    idx = find(  ( (~isnan(t.time).') .* (~isnan(cKPI_mean{j})) ) == 1  );
+    fll = fill([t.time(idx)' fliplr(t.time(idx)')]/3600/24, ...
+         [(cKPI_mean{j}(idx) + cKPI_std{j}(idx)) ...
+          fliplr((cKPI_mean{j}(idx) - cKPI_std{j}(idx)))], ...
+         C2{j});
+    fll.FaceAlpha = 0.2; fll.EdgeColor = 'none'
     hold on
-    plot(cKPI_mean{j} + cKPI_std{j}, [C{j}, '--'])
-    plot(cKPI_mean{j} - cKPI_std{j}, [C{j}, '--'])
-
+    plot(t.time/3600/24, cKPI_mean{j}, 'Color', C2{j}, 'LineWidth', 2)
+    
 
 end
 
+% figure(5)
+% legend('','No intervention', ...
+%        '','Planned maintenance only', ...
+%        '','Planned and unplanned maintenance', ...
+%        'Location','southwest')
+% xlabel('Time (days)'); ylabel('Cumulative fractional gain / loss')
 
+figure(6)
+legend('',['Planned and unplanned', newline, 'maintenance'], ...
+       '','Planned maintenance only', ...
+       '','No intervention', ...
+       'Location','southeast','FontSize',11)
+xlabel('Time (days)','FontSize',11); ylabel('Cumulative profit','FontSize',11)
+a =gca(); a.YTick = []; a.XLim = [0, 28]; a.YLim = [-6000 20000];
+set(figure(6),'WindowStyle','normal')
+set(figure(6), 'Units', 'centimeters');
+set(figure(6), 'position', [2 2 8.4 8.4]);
 
