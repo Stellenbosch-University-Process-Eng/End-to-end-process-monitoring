@@ -2,7 +2,6 @@
 Simulation used to demonstrate end to end process monitoring, in preparation for IFAC World Congress 2023
 
 To do:
-* Add griddedInterpolant function
 * Implement control charts as alternate monitoring method
 * Implement two different advisories
 * Separate "r" into a supervisory control signal "r" and a maintenance signal "q"
